@@ -45,9 +45,10 @@ services:
     container_name: gymplan-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?MONGO_USER must be set in .env}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?MONGO_PASSWORD must be set in .env}
-      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:?MONGO_DATABASE must be set in .env}
+      # Mongo 표준 환경변수명을 그대로 사용 (.env 의 키와 1:1)
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME must be set in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD must be set in .env}
+      MONGO_INITDB_DATABASE: gymplan   # DB 이름은 시크릿 아님, 하드코딩
     ports:
       - "27017:27017"
     volumes:
@@ -100,33 +101,40 @@ services:
       retries: 10
 
   # ───── Kafka (KRaft 모드, Zookeeper 불필요) ─────
-  # 참고: 신규 Kafka 3.x 부터 KRaft 가 권장. Zookeeper 의존성 제거.
+  # Apache 공식 이미지 사용 (Bitnami 가 구버전 태그를 제거하여 변경)
   kafka:
-    image: bitnami/kafka:3.8
+    image: apache/kafka:3.8.0
     container_name: gymplan-kafka
     restart: unless-stopped
     environment:
-      # KRaft 모드
-      KAFKA_CFG_NODE_ID: 1
-      KAFKA_CFG_PROCESS_ROLES: broker,controller
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      ALLOW_PLAINTEXT_LISTENER: "yes"
-      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # KRaft 모드 — 단일 노드 (broker + controller 동시 수행)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # 단일 노드용 replication / ISR 설정
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # CLUSTER_ID 는 이미지가 첫 기동 시 자동 생성. 직접 지정 시 base64 22자 UUID 형식 필수.
     ports:
       - "9092:9092"
       - "9094:9094"
     volumes:
-      - kafka-data:/bitnami/kafka
+      - kafka-data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      test:
+        - "CMD-SHELL"
+        - "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"
       interval: 15s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
   # ───── Kafka UI: 토픽/메시지 대시보드 ─────
   kafka-ui:

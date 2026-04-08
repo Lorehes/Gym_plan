@@ -13,6 +13,7 @@ include("common:common-exception")
 include("common:common-security")
 
 // ───── Service modules ─────
+include("services:api-gateway")
 include("services:user-service")
 include("services:plan-service")
 include("services:exercise-catalog")
