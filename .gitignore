@@ -38,9 +38,12 @@ out/
 # ==============================
 # 환경 변수 & 시크릿 (절대 커밋 금지)
 # ==============================
+# 정책: dev/local 전용이어도 보안 관련 파일은 일체 추적하지 않는다.
+# .env.example 같은 placeholder/template 도 비밀번호 패턴이 들어가면 누출 위험 → 차단.
 .env
 .env.*
-!.env.example
+.env.example
+**/.env.example
 *.key
 *.pem
 *.p12
@@ -51,6 +54,9 @@ application-secret.yml
 application-secret.yaml
 **/src/main/resources/application-local*.yml
 **/src/main/resources/application-secret*.yml
+
+# Vault 설정/스크립트 일체 차단 (시드 토큰, 키 생성 로직 등 보안 절차 포함)
+infra/vault/
 
 # ==============================
 # 로그
@@ -140,5 +146,16 @@ vault-token
 # ==============================
 # Docs
 # ==============================
-docs/
+# docs/ 는 1인 개발 + Claude 협업 컨텍스트로 추적한다.
+# 단, 변환된 바이너리 명세는 차단.
+docs/**/*.docx
+
+# ==============================
+# .claude — Claude Code 협업 자산
+# ==============================
+# CLAUDE.md (프로젝트 지침서) 와 skills/ 는 추적,
+# 나머지 (sessions, cache, todo, agent state 등) 는 모두 차단.
 .claude/*
+!.claude/CLAUDE.md
+!.claude/skills/
+.claude/skills/.DS_Store

@@ -1,0 +1,150 @@
+# ==============================
+# GymPlan — 로컬 개발용 인프라
+# ==============================
+# 사용:
+#   cd infra/docker-compose
+#   # .env 파일을 직접 작성 (커밋 금지, .gitignore 처리됨)
+#   docker compose -f docker-compose.local.yml up -d
+#
+# 보안 정책:
+# - 이 파일에는 어떠한 비밀번호/토큰 placeholder 도 두지 않는다.
+# - 모든 시크릿은 .env 에서만 주입. 미설정 시 ${VAR:?...} 가 즉시 실패시킨다.
+# - .env, .env.example 등 시크릿 패턴 파일은 모두 .gitignore 처리됨.
+# - 운영 환경에서는 Vault 주입 (docs/context/security-guide.md 참조)
+
+services:
+  # ───── MySQL: 사용자, 루틴, 운동 종목 (영구 저장) ─────
+  mysql:
+    image: mysql:8.4
+    container_name: gymplan-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE must be set in .env}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER must be set in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set in .env}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # 비밀번호 없이 ping (mysqladmin ping 은 인증 없이도 포트 응답만 확인하면 OK)
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───── MongoDB: 운동 세션 기록 (workout-service) ─────
+  mongodb:
+    image: mongo:7.0
+    container_name: gymplan-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?MONGO_USER must be set in .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?MONGO_PASSWORD must be set in .env}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:?MONGO_DATABASE must be set in .env}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───── Redis: 세션, 캐시, Rate Limit, pub-sub ─────
+  redis:
+    image: redis:7.4-alpine
+    container_name: gymplan-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
+    # entrypoint 에서 환경변수를 읽어 --requirepass 로 전달 (compose 파일에 평문 노출 X)
+    command: ["sh", "-c", "redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      # 환경변수를 컨테이너 내부에서 참조 (compose 파일/로그에 비밀번호 노출 방지)
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ───── Elasticsearch: 운동 종목 검색 (nori), 통계 집계 ─────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: gymplan-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false       # 로컬 전용
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.name=gymplan-local
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ───── Kafka (KRaft 모드, Zookeeper 불필요) ─────
+  # 참고: 신규 Kafka 3.x 부터 KRaft 가 권장. Zookeeper 의존성 제거.
+  kafka:
+    image: bitnami/kafka:3.8
+    container_name: gymplan-kafka
+    restart: unless-stopped
+    environment:
+      # KRaft 모드
+      KAFKA_CFG_NODE_ID: 1
+      KAFKA_CFG_PROCESS_ROLES: broker,controller
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CFG_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    volumes:
+      - kafka-data:/bitnami/kafka
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  # ───── Kafka UI: 토픽/메시지 대시보드 ─────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: gymplan-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: gymplan-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "9000:8080"
+
+volumes:
+  mysql-data:
+  mongo-data:
+  redis-data:
+  es-data:
+  kafka-data:
