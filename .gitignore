@@ -142,3 +142,4 @@ vault-token
 # ==============================
 docs/
 Claude.md
+*.docx
