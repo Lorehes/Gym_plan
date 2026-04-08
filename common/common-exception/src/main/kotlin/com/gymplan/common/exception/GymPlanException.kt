@@ -23,22 +23,26 @@ class NotFoundException(
     errorCode: ErrorCode,
     message: String? = null,
     details: Map<String, Any?> = emptyMap(),
-) : GymPlanException(errorCode, message, details)
+    cause: Throwable? = null,
+) : GymPlanException(errorCode, message, details, cause)
 
 class UnauthorizedException(
     errorCode: ErrorCode = ErrorCode.AUTH_INVALID_TOKEN,
     message: String? = null,
     details: Map<String, Any?> = emptyMap(),
-) : GymPlanException(errorCode, message, details)
+    cause: Throwable? = null,
+) : GymPlanException(errorCode, message, details, cause)
 
 class ForbiddenException(
     errorCode: ErrorCode,
     message: String? = null,
     details: Map<String, Any?> = emptyMap(),
-) : GymPlanException(errorCode, message, details)
+    cause: Throwable? = null,
+) : GymPlanException(errorCode, message, details, cause)
 
 class ConflictException(
     errorCode: ErrorCode,
     message: String? = null,
     details: Map<String, Any?> = emptyMap(),
-) : GymPlanException(errorCode, message, details)
+    cause: Throwable? = null,
+) : GymPlanException(errorCode, message, details, cause)
