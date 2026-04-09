@@ -51,8 +51,9 @@ abstract class AbstractGatewayTest {
             // 테스트에서 세션 체크 비활성화 (user-service 가 없으므로)
             registry.add("gymplan.gateway.security.session-check-enabled") { false }
             // Rate limit 설정 (테스트에서 빠르게 도달하도록 낮은 값 사용)
-            registry.add("gymplan.gateway.rate-limit.ip-limit-per-min") { 5 }
-            registry.add("gymplan.gateway.rate-limit.user-limit-per-min") { 10 }
+            // IP 제한 > User 제한으로 설정해 user rate limit 테스트 시 IP 제한에 먼저 걸리지 않도록 한다.
+            registry.add("gymplan.gateway.rate-limit.ip-limit-per-min") { 20 }
+            registry.add("gymplan.gateway.rate-limit.user-limit-per-min") { 5 }
         }
     }
 }

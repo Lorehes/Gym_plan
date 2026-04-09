@@ -2,6 +2,7 @@ package com.gymplan.gateway.filter
 
 import com.gymplan.gateway.AbstractGatewayTest
 import com.gymplan.gateway.TestRouteConfig
+import io.jsonwebtoken.Jwts
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -11,6 +12,11 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.test.web.reactive.server.WebTestClient
+import java.security.KeyFactory
+import java.security.spec.PKCS8EncodedKeySpec
+import java.time.Instant
+import java.util.Base64
+import java.util.Date
 
 /**
  * JwtAuthenticationFilter 통합 테스트.
@@ -135,5 +141,47 @@ class JwtAuthenticationFilterTest : AbstractGatewayTest() {
             .header(HttpHeaders.AUTHORIZATION, "Bearer $refreshToken")
             .exchange()
             .expectStatus().isUnauthorized
+    }
+
+    @Test
+    @DisplayName("만료된 Access Token 이면 401 AUTH_EXPIRED_TOKEN")
+    fun expiredAccessTokenRejected() {
+        val expiredToken = createExpiredAccessToken(42L, "expired@gymplan.io")
+
+        client.get().uri("/api/v1/plans")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer $expiredToken")
+            .exchange()
+            .expectStatus().isUnauthorized
+            .expectBody()
+            .jsonPath("$.success").isEqualTo(false)
+            .jsonPath("$.error.code").isEqualTo("AUTH_EXPIRED_TOKEN")
+    }
+
+    /**
+     * 테스트용 만료된 Access Token 생성.
+     * JwtProvider 는 만료 토큰 생성 메서드를 제공하지 않으므로 jjwt 로 직접 빌드한다.
+     */
+    private fun createExpiredAccessToken(
+        userId: Long,
+        email: String,
+    ): String {
+        val pem = testKeys.privateKeyPem
+        val der =
+            Base64.getDecoder().decode(
+                pem.replace("-----BEGIN PRIVATE KEY-----", "")
+                    .replace("-----END PRIVATE KEY-----", "")
+                    .replace("\\s".toRegex(), ""),
+            )
+        val privateKey = KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(der))
+        val past = Instant.now().minusSeconds(120)
+        return Jwts.builder()
+            .issuer("gymplan-test")
+            .subject(userId.toString())
+            .claim("email", email)
+            .claim("type", "access")
+            .issuedAt(Date.from(past.minusSeconds(60)))
+            .expiration(Date.from(past))
+            .signWith(privateKey, Jwts.SIG.RS256)
+            .compact()
     }
 }
