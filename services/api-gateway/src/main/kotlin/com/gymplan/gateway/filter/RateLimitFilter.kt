@@ -8,6 +8,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain
 import org.springframework.cloud.gateway.filter.GlobalFilter
 import org.springframework.core.Ordered
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
+import org.springframework.data.redis.core.script.RedisScript
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
@@ -82,21 +83,19 @@ class RateLimitFilter(
     }
 
     /**
-     * INCR 후 카운터가 1이면 (= 새로 만들어진 키) EXPIRE 를 설정한다.
-     * 같은 분 윈도우 내 후속 요청은 EXPIRE 를 건너뛴다.
+     * Lua script 로 INCR + EXPIRE 를 원자적으로 수행한다.
+     *
+     * 키가 새로 생성되면 (INCR 결과 1) TTL 을 설정하고,
+     * 이미 존재하면 카운터만 증가시킨다.
+     * INCR 과 EXPIRE 사이에 크래시가 발생해도 TTL 없는 키가 잔류하지 않는다.
      */
     private fun increment(
         key: String,
         ttl: Duration,
     ): Mono<Long> =
-        redis.opsForValue().increment(key)
-            .flatMap { count ->
-                if (count == 1L) {
-                    redis.expire(key, ttl).thenReturn(count)
-                } else {
-                    Mono.just(count)
-                }
-            }
+        redis.execute(INCR_WITH_EXPIRE_SCRIPT, listOf(key), listOf(ttl.seconds.toString()))
+            .next()
+            .map { it.toLong() }
 
     /**
      * 분 단위 시간 버킷. 윈도우가 다르더라도 정수 분으로 키를 분리하면
@@ -115,21 +114,36 @@ class RateLimitFilter(
 
     /**
      * 클라이언트 실제 IP 를 얻는다.
-     * X-Forwarded-For 가 있으면 첫 번째 항목을 사용 (LB/Ingress 통과).
-     * 신뢰할 수 있는 프록시 뒤에 있다는 가정하에서만 사용해야 한다.
+     *
+     * remoteAddress 만 사용한다. X-Forwarded-For 를 직접 파싱하면 클라이언트가
+     * 헤더를 조작해 Rate Limit 을 우회할 수 있으므로 신뢰하지 않는다.
+     *
+     * 운영 환경에서는 Istio Ingress / K8s Service 가 remoteAddress 를 올바른 클라이언트 IP 로
+     * 설정하며, Spring Cloud Gateway 의 XForwardedHeadersFilter 가 필요 시 XFF 를 관리한다.
      */
-    private fun clientIp(exchange: ServerWebExchange): String {
-        val xff = exchange.request.headers.getFirst("X-Forwarded-For")
-        if (!xff.isNullOrBlank()) {
-            return xff.substringBefore(',').trim()
-        }
-        return exchange.request.remoteAddress?.address?.hostAddress ?: "unknown"
-    }
+    private fun clientIp(exchange: ServerWebExchange): String = exchange.request.remoteAddress?.address?.hostAddress ?: "unknown"
 
     /** JwtAuthenticationFilter 다음에 실행. */
     override fun getOrder(): Int = ORDER
 
     companion object {
         const val ORDER = -50
+
+        /**
+         * INCR + 조건부 EXPIRE 를 원자적으로 수행하는 Lua script.
+         * KEYS[1] = rate limit 키, ARGV[1] = TTL (초).
+         * 반환: INCR 후 카운터 값.
+         */
+        private val INCR_WITH_EXPIRE_SCRIPT: RedisScript<String> =
+            RedisScript.of(
+                """
+                local count = redis.call('INCR', KEYS[1])
+                if count == 1 then
+                    redis.call('EXPIRE', KEYS[1], tonumber(ARGV[1]))
+                end
+                return tostring(count)
+                """.trimIndent(),
+                String::class.java,
+            )
     }
 }

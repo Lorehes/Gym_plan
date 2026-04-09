@@ -119,7 +119,17 @@ class JwtAuthenticationFilter(
         return builder.build()
     }
 
-    private fun isWhitelisted(path: String): Boolean = properties.security.whitelistPaths.any { path.startsWith(it) }
+    /**
+     * whitelist 경로 매칭.
+     *
+     * 정확히 일치하거나, 경로 뒤에 '/' 가 이어지는 경우만 허용한다.
+     * startsWith 만 사용하면 `/api/v1/auth/login-admin` 같은 의도치 않은
+     * 경로가 화이트리스트될 수 있다.
+     */
+    private fun isWhitelisted(path: String): Boolean =
+        properties.security.whitelistPaths.any { pattern ->
+            path == pattern || path.startsWith("$pattern/")
+        }
 
     /** RateLimitFilter 보다 먼저 (작을수록 먼저). */
     override fun getOrder(): Int = ORDER

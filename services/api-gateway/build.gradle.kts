@@ -1,6 +1,6 @@
 // ───── api-gateway: 라우팅, JWT 검증 필터, Rate Limiting ─────
 // Spring Cloud Gateway (Reactive 기반).
-// JWT 검증 → X-User-Id 헤더 주입은 common-security 의 JwtAuthenticationWebFilter 가 담당.
+// JWT 검증 → X-User-Id 헤더 주입은 gateway 자체 JwtAuthenticationFilter (GlobalFilter) 가 담당.
 plugins {
     id("org.springframework.boot")
 }
@@ -49,4 +49,5 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")
     testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("io.jsonwebtoken:jjwt-api:0.12.6")
 }
