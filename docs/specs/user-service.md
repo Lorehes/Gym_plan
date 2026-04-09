@@ -212,12 +212,17 @@
 
 | 키 패턴 | 값 | TTL | 용도 |
 |---------|-----|-----|------|
-| `user:session:{userId}:{sessionId}` | JSON (issuedAt, deviceInfo) | 30분 | Access Token 세션 검증 |
 | `user:refresh:{tokenHash}` | userId | 7일 | Refresh Token 유효성 검증 |
-| `user:login:fail:{email}` | 카운터 | 5분 | 브루트포스 방어 |
-| `user:locked:{email}` | true | 5분 | 잠금 상태 |
+| `user:refresh:index:{userId}` | SET of tokenHash | 7일 | 사용자별 Refresh Token 인덱스 (전체 무효화용) |
+| `user:login:fail:{email}` | 카운터 | 1분 | 브루트포스 실패 카운터 |
+| `user:locked:{email}` | "1" | 5분 | 잠금 상태 |
 
-> `tokenHash`는 SHA-256 해시. 원본 토큰은 Redis에 저장하지 않는다.
+> `tokenHash`는 SHA-256 해시(16진수 소문자). 원본 토큰은 Redis에 저장하지 않는다.
+>
+> **Phase 1 범위 조정**: 초기 드래프트에는 `user:session:{userId}:{sessionId}` 키가 포함되어 있었으나,
+> 현재 디자인에서는 Refresh Token Rotation 만으로 세션 수명을 관리한다.
+> 세션 단위 식별자는 Gateway 가 sessionId 헤더를 전달하도록 확장되는 **Phase 2** 에서 도입한다.
+> 그 전까지 "단일 디바이스만 로그아웃" 요구가 발생하면 이 표에 키를 다시 추가하고 AuthService.logout() 을 확장해야 한다.
 
 ---
 
@@ -268,7 +273,7 @@
 
 **Then**
 - HTTP 400을 반환한다.
-- 응답 `error.code`는 `VALIDATION_ERROR`이다.
+- 응답 `error.code`는 `VALIDATION_FAILED`이다.
 - DB에는 어떤 row도 생성되지 않는다.
 
 ---
@@ -491,7 +496,7 @@
 
 **Then**
 - HTTP 400을 반환한다.
-- `error.code`는 `VALIDATION_ERROR`이다.
+- `error.code`는 `VALIDATION_FAILED`이다.
 - DB는 변경되지 않는다.
 
 ---
@@ -506,7 +511,7 @@
 
 **Then**
 - HTTP 400을 반환한다.
-- `error.code`는 `VALIDATION_ERROR`이며 메시지는 "프로필 이미지는 https URL만 허용됩니다"이다.
+- `error.code`는 `VALIDATION_FAILED`이며 메시지는 "프로필 이미지는 https URL만 허용됩니다"이다.
 
 ---
 
@@ -583,7 +588,7 @@
 | `AUTH_INVALID_REFRESH_TOKEN` | 401 | 유효하지 않거나 만료된 토큰입니다 | Refresh Token 검증 실패 |
 | `AUTH_REFRESH_TOKEN_REUSED` | 401 | 토큰 재사용이 감지되어 모든 세션이 종료되었습니다 | Rotation된 토큰 재사용 |
 | `AUTH_UNAUTHORIZED` | 401 | 인증이 필요합니다 | Access Token 누락/만료 |
-| `VALIDATION_ERROR` | 400 | 입력값이 올바르지 않습니다 | @Valid 검증 실패 |
+| `VALIDATION_FAILED` | 400 | 입력값이 올바르지 않습니다 | @Valid 검증 실패 |
 | `RATE_LIMIT_EXCEEDED` | 429 | 요청이 너무 많습니다 | Gateway Rate Limit |
 | `SERVER_ERROR` | 500 | 서버 내부 오류 | 예기치 못한 예외 |
 

@@ -26,16 +26,20 @@ import reactor.core.publisher.Mono
  */
 class JwtAuthenticationWebFilter(
     private val jwtProvider: JwtProvider,
-    private val whitelistPaths: List<String> = listOf(
-        "/api/v1/auth/login",
-        "/api/v1/auth/signup",
-        "/api/v1/auth/refresh",
-        "/actuator/health",
-    ),
+    private val whitelistPaths: List<String> =
+        listOf(
+            "/api/v1/auth/login",
+            "/api/v1/auth/signup",
+            "/api/v1/auth/refresh",
+            "/actuator/health",
+        ),
 ) : WebFilter {
     private val log = LoggerFactory.getLogger(JwtAuthenticationWebFilter::class.java)
 
-    override fun filter(exchange: ServerWebExchange, chain: WebFilterChain): Mono<Void> {
+    override fun filter(
+        exchange: ServerWebExchange,
+        chain: WebFilterChain,
+    ): Mono<Void> {
         val request = exchange.request
         val path = request.path.value()
 
@@ -51,8 +55,9 @@ class JwtAuthenticationWebFilter(
         }
 
         // 3. Authorization 헤더 확인
-        val authHeader = request.headers.getFirst(HttpHeaders.AUTHORIZATION)
-            ?: return Mono.error(UnauthorizedException(ErrorCode.AUTH_INVALID_TOKEN))
+        val authHeader =
+            request.headers.getFirst(HttpHeaders.AUTHORIZATION)
+                ?: return Mono.error(UnauthorizedException(ErrorCode.AUTH_INVALID_TOKEN))
 
         if (!authHeader.startsWith(BEARER_PREFIX)) {
             return Mono.error(UnauthorizedException(ErrorCode.AUTH_INVALID_TOKEN))

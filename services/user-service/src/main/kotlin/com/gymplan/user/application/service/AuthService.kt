@@ -64,7 +64,7 @@ class AuthService(
                 userRepository.save(user)
             } catch (e: DataIntegrityViolationException) {
                 // UNIQUE 제약 경합 (TC-020)
-                throw ConflictException(ErrorCode.AUTH_DUPLICATE_EMAIL, cause = e.toErrorCause())
+                throw ConflictException(ErrorCode.AUTH_DUPLICATE_EMAIL, cause = e)
             }
 
         val tokens = issueTokens(saved)
@@ -183,10 +183,11 @@ class AuthService(
     /**
      * 로그아웃 (TC-012).
      *
+     * JPA 를 건드리지 않으므로 트랜잭션 경계가 없다.
+     *
      * 현재 디자인: 해당 사용자의 모든 Refresh Token 을 폐기한다.
      * 향후 Gateway 에서 sessionId 를 전달하도록 확장되면 단일 세션 로그아웃으로 전환 가능.
      */
-    @Transactional(readOnly = true)
     fun logout(userId: Long) {
         tokenStore.revokeAllRefreshTokens(userId)
         log.info("로그아웃 완료: userId={}", userId)
@@ -209,6 +210,4 @@ class AuthService(
         if (at <= 1) return "***"
         return "${email.first()}***${email.substring(at)}"
     }
-
-    private fun Throwable.toErrorCause(): Throwable = this
 }

@@ -284,6 +284,26 @@ class AuthServiceTest {
         verify(tokenStore, never()).saveRefreshToken(any(), any())
     }
 
+    @Test
+    @DisplayName("TC-011b: 클레임의 userId 와 저장소의 userId 가 다르면 전체 세션 폐기 후 REUSED 예외")
+    fun refresh_claimStoreMismatch() {
+        // JWT 는 userId=1 을 주장하지만, Redis 에는 동일 토큰 해시가 userId=2 로 저장되어 있음.
+        // 정상적으로는 발생할 수 없는 상태 — 위조 또는 심각한 저장소 손상을 의미하므로
+        // 재사용과 동일하게 클레임이 주장한 userId 의 전체 세션을 폐기한다.
+        val token = "RT_FORGED"
+        whenever(jwtProvider.parse(token)).thenReturn(JwtPayload(1L, null, "refresh"))
+        whenever(tokenStore.findUserIdByRefreshToken(token)).thenReturn(2L)
+
+        assertThatThrownBy { authService.refresh(RefreshRequest(token)) }
+            .isInstanceOf(UnauthorizedException::class.java)
+            .extracting("errorCode")
+            .isEqualTo(ErrorCode.AUTH_REFRESH_TOKEN_REUSED)
+
+        verify(tokenStore).revokeAllRefreshTokens(1L)
+        verify(tokenStore, never()).deleteRefreshToken(any(), any())
+        verify(tokenStore, never()).saveRefreshToken(any(), any())
+    }
+
     // ─────────────── TC-012: 로그아웃 ───────────────
 
     @Test

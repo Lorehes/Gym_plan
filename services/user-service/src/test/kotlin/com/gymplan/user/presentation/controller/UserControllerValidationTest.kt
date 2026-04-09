@@ -62,6 +62,29 @@ class UserControllerValidationTest {
             .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"))
     }
 
+    @Test
+    @DisplayName("TC-015b: X-User-Id 가 0 이하이면 401 (Defense-in-Depth)")
+    fun getMe_nonPositiveUserId() {
+        mockMvc
+            .perform(get("/api/v1/users/me").header("X-User-Id", "0"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"))
+
+        mockMvc
+            .perform(get("/api/v1/users/me").header("X-User-Id", "-1"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"))
+    }
+
+    @Test
+    @DisplayName("TC-015c: X-User-Id 가 숫자가 아니면 401")
+    fun getMe_nonNumericUserId() {
+        mockMvc
+            .perform(get("/api/v1/users/me").header("X-User-Id", "abc"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"))
+    }
+
     // ─────────────── TC-017: 닉네임 1자 검증 실패 ───────────────
 
     @Test
