@@ -13,6 +13,7 @@ import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
 import java.util.Base64
 import java.util.Date
+import java.util.UUID
 
 /**
  * RS256 JWT 발급/검증.
@@ -39,7 +40,10 @@ class JwtProvider(
 
     // ───── 발급 ─────
 
-    fun createAccessToken(userId: Long, email: String): String {
+    fun createAccessToken(
+        userId: Long,
+        email: String,
+    ): String {
         val key = privateKey ?: error("privateKey 없이 토큰 발급 불가 — user-service 만 발급 가능")
         val now = Instant.now()
         return Jwts.builder()
@@ -56,9 +60,12 @@ class JwtProvider(
     fun createRefreshToken(userId: Long): String {
         val key = privateKey ?: error("privateKey 없이 토큰 발급 불가 — user-service 만 발급 가능")
         val now = Instant.now()
+        // Refresh Token 은 초 단위 해상도의 iat 만으로는 충돌 가능성이 있어 (같은 초 안에 rotation 이
+        // 일어나면 동일 토큰이 재발급되어 재사용 탐지 인덱스가 무너진다) 매 발급마다 고유 JTI 를 부여한다.
         return Jwts.builder()
             .issuer(properties.issuer)
             .subject(userId.toString())
+            .id(UUID.randomUUID().toString())
             .claim("type", "refresh")
             .issuedAt(Date.from(now))
             .expiration(Date.from(now.plus(properties.refreshTokenTtl)))
@@ -102,7 +109,10 @@ class JwtProvider(
         return KeyFactory.getInstance("RSA").generatePrivate(PKCS8EncodedKeySpec(der))
     }
 
-    private fun pemToDer(pem: String, type: String): ByteArray {
+    private fun pemToDer(
+        pem: String,
+        type: String,
+    ): ByteArray {
         val cleaned =
             pem
                 .replace("-----BEGIN $type-----", "")
@@ -121,6 +131,6 @@ data class JwtPayload(
     val type: String,
 ) {
     fun isAccess(): Boolean = type == "access"
+
     fun isRefresh(): Boolean = type == "refresh"
 }
-
