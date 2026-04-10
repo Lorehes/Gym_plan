@@ -4,7 +4,7 @@ import com.gymplan.common.dto.ApiResponse
 import com.gymplan.user.application.dto.UpdateProfileRequest
 import com.gymplan.user.application.dto.UserProfileResponse
 import com.gymplan.user.application.service.UserService
-import com.gymplan.user.presentation.security.CurrentUserId
+import com.gymplan.common.security.CurrentUserId
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping

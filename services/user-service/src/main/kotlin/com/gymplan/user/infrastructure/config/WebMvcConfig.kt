@@ -1,6 +1,6 @@
 package com.gymplan.user.infrastructure.config
 
-import com.gymplan.user.presentation.security.CurrentUserIdArgumentResolver
+import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer

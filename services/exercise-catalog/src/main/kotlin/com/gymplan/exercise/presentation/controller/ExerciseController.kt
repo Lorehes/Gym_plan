@@ -9,7 +9,7 @@ import com.gymplan.exercise.application.service.ExerciseSearchService
 import com.gymplan.exercise.application.service.ExerciseService
 import com.gymplan.exercise.domain.vo.Equipment
 import com.gymplan.exercise.domain.vo.MuscleGroup
-import com.gymplan.exercise.presentation.security.CurrentUserId
+import com.gymplan.common.security.CurrentUserId
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -43,6 +43,7 @@ class ExerciseController(
 ) {
     @GetMapping
     fun search(
+        @CurrentUserId userId: Long,
         @RequestParam(required = false) q: String?,
         @RequestParam(required = false) muscle: MuscleGroup?,
         @RequestParam(required = false) equipment: Equipment?,
@@ -61,6 +62,7 @@ class ExerciseController(
 
     @GetMapping("/{exerciseId}")
     fun getById(
+        @CurrentUserId userId: Long,
         @PathVariable exerciseId: Long,
     ): ApiResponse<ExerciseDetailResponse> = ApiResponse.success(exerciseService.getById(exerciseId))
 

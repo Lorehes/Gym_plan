@@ -103,7 +103,7 @@
 #### 시나리오 2: 필수 필드 누락
 **Given** 사용자가 인증된 상태이고
 **When** name 없이 종목 생성을 요청하면
-**Then** 400 응답과 함께 VALIDATION_ERROR가 반환된다
+**Then** 400 응답과 함께 VALIDATION_FAILED가 반환된다
 **And** 누락된 필드에 대한 상세 메시지가 포함된다
 
 #### 시나리오 3: 인증되지 않은 사용자
@@ -225,7 +225,7 @@ Content-Type: application/json
   "success": false,
   "data": null,
   "error": {
-    "code": "VALIDATION_ERROR",
+    "code": "VALIDATION_FAILED",
     "message": "유효하지 않은 muscle 값입니다: INVALID_VALUE"
   },
   "timestamp": "2026-04-10T09:00:00Z"
@@ -344,7 +344,7 @@ Content-Type: application/json
   "success": false,
   "data": null,
   "error": {
-    "code": "VALIDATION_ERROR",
+    "code": "VALIDATION_FAILED",
     "message": "입력값 검증에 실패했습니다",
     "details": {
       "name": "종목 이름은 필수입니다",
@@ -401,7 +401,7 @@ Content-Type: application/json
 | 에러 코드 | HTTP 상태 | 설명 |
 |----------|-----------|------|
 | `EXERCISE_NOT_FOUND` | 404 | 요청한 종목이 존재하지 않음 |
-| `VALIDATION_ERROR` | 400 | 입력값 검증 실패 (파라미터 오류, 필수값 누락) |
+| `VALIDATION_FAILED` | 400 | 입력값 검증 실패 (파라미터 오류, 필수값 누락) |
 | `AUTH_INVALID_TOKEN` | 401 | 유효하지 않은 인증 토큰 |
 | `AUTH_EXPIRED_TOKEN` | 401 | 만료된 인증 토큰 |
 | `RATE_LIMIT_EXCEEDED` | 429 | API 호출 한도 초과 |
@@ -545,7 +545,7 @@ Content-Type: application/json
 
 **예상 결과:**
 - ✅ 400 Bad Request
-- ✅ error.code: VALIDATION_ERROR
+- ✅ error.code: VALIDATION_FAILED
 
 ---
 
@@ -608,7 +608,7 @@ Content-Type: application/json
 
 **예상 결과:**
 - ✅ 400 Bad Request
-- ✅ error.code: VALIDATION_ERROR
+- ✅ error.code: VALIDATION_FAILED
 - ✅ error.details에 누락 필드 정보 포함
 
 ---

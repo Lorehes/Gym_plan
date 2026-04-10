@@ -17,6 +17,7 @@ import org.springframework.boot.runApplication
     scanBasePackages = [
         "com.gymplan.exercise",
         "com.gymplan.common.exception",
+        "com.gymplan.common.security",
     ],
 )
 class ExerciseCatalogApplication

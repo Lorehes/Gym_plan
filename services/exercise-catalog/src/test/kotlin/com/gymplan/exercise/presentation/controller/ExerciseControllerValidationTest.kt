@@ -9,7 +9,7 @@ import com.gymplan.exercise.application.service.ExerciseService
 import com.gymplan.exercise.domain.vo.Difficulty
 import com.gymplan.exercise.domain.vo.Equipment
 import com.gymplan.exercise.domain.vo.MuscleGroup
-import com.gymplan.exercise.presentation.security.CurrentUserIdArgumentResolver
+import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
@@ -70,11 +70,24 @@ class ExerciseControllerValidationTest {
         ).thenReturn(pageResponse)
 
         mockMvc
-            .perform(get("/api/v1/exercises").param("q", "벤치"))
+            .perform(
+                get("/api/v1/exercises")
+                    .header("X-User-Id", "1")
+                    .param("q", "벤치"),
+            )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.content[0].name").value("벤치프레스"))
             .andExpect(jsonPath("$.data.totalElements").value(1))
+    }
+
+    @Test
+    @DisplayName("TC-EC-001-2: X-User-Id 없이 검색 시 401")
+    fun search_unauthorized() {
+        mockMvc
+            .perform(get("/api/v1/exercises").param("q", "벤치"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"))
     }
 
     // ─────────────── TC-EC-008: 종목 상세 조회 ───────────────
@@ -98,11 +111,23 @@ class ExerciseControllerValidationTest {
         )
 
         mockMvc
-            .perform(get("/api/v1/exercises/10"))
+            .perform(
+                get("/api/v1/exercises/10")
+                    .header("X-User-Id", "1"),
+            )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.exerciseId").value(10))
             .andExpect(jsonPath("$.data.description").value("가슴 운동의 기본"))
+    }
+
+    @Test
+    @DisplayName("TC-EC-008-2: X-User-Id 없이 상세 조회 시 401")
+    fun getById_unauthorized() {
+        mockMvc
+            .perform(get("/api/v1/exercises/10"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_TOKEN"))
     }
 
     // ─────────────── TC-EC-010: 커스텀 종목 생성 ───────────────

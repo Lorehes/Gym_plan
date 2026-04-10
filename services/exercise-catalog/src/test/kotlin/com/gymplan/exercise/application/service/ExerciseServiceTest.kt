@@ -4,32 +4,34 @@ import com.gymplan.common.exception.ErrorCode
 import com.gymplan.common.exception.NotFoundException
 import com.gymplan.exercise.application.dto.CreateExerciseRequest
 import com.gymplan.exercise.domain.entity.Exercise
+import com.gymplan.exercise.domain.event.ExerciseCreatedEvent
 import com.gymplan.exercise.domain.repository.ExerciseRepository
 import com.gymplan.exercise.domain.vo.Difficulty
 import com.gymplan.exercise.domain.vo.Equipment
 import com.gymplan.exercise.domain.vo.MuscleGroup
-import com.gymplan.exercise.infrastructure.search.ExerciseIndexer
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.springframework.context.ApplicationEventPublisher
 import java.util.Optional
 
 class ExerciseServiceTest {
     private lateinit var exerciseRepository: ExerciseRepository
-    private lateinit var exerciseIndexer: ExerciseIndexer
+    private lateinit var eventPublisher: ApplicationEventPublisher
     private lateinit var exerciseService: ExerciseService
 
     @BeforeEach
     fun setUp() {
         exerciseRepository = mock()
-        exerciseIndexer = mock()
-        exerciseService = ExerciseService(exerciseRepository, exerciseIndexer)
+        eventPublisher = mock()
+        exerciseService = ExerciseService(exerciseRepository, eventPublisher)
     }
 
     // ─────────────── TC-EC-008: 종목 상세 조회 성공 ───────────────
@@ -67,7 +69,7 @@ class ExerciseServiceTest {
     // ─────────────── TC-EC-010: 커스텀 종목 생성 성공 ───────────────
 
     @Test
-    @DisplayName("TC-EC-010: 커스텀 종목 생성 성공 — isCustom=true, createdBy=userId")
+    @DisplayName("TC-EC-010: 커스텀 종목 생성 성공 — isCustom=true, createdBy=userId, 이벤트 발행")
     fun create_success() {
         val request =
             CreateExerciseRequest(
@@ -93,7 +95,13 @@ class ExerciseServiceTest {
         assertThat(response.name).isEqualTo("하프 스쿼트")
         assertThat(response.isCustom).isTrue()
         assertThat(response.createdBy).isEqualTo(42L)
-        verify(exerciseIndexer).index(any())
+
+        val eventCaptor = argumentCaptor<ExerciseCreatedEvent>()
+        verify(eventPublisher).publishEvent(eventCaptor.capture())
+        val event = eventCaptor.firstValue
+        assertThat(event.exerciseId).isEqualTo(301L)
+        assertThat(event.name).isEqualTo("하프 스쿼트")
+        assertThat(event.muscleGroup).isEqualTo("LEGS")
     }
 
     // ─────────────── 헬퍼 ───────────────

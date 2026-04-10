@@ -1,4 +1,4 @@
-package com.gymplan.user.presentation.security
+package com.gymplan.common.security
 
 /**
  * 인증된 사용자의 userId 를 주입받기 위한 메서드 파라미터 어노테이션.
