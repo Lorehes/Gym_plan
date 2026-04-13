@@ -1,4 +1,4 @@
-package com.gymplan.user.presentation.security
+package com.gymplan.common.security
 
 import com.gymplan.common.exception.ErrorCode
 import com.gymplan.common.exception.UnauthorizedException
@@ -24,7 +24,6 @@ class CurrentUserIdArgumentResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean {
         if (!parameter.hasParameterAnnotation(CurrentUserId::class.java)) return false
         val type = parameter.parameterType
-        // Kotlin `Long` → 기본형 long, 박싱 타입 둘 다 허용
         return type == java.lang.Long::class.java || type == java.lang.Long.TYPE
     }
 
@@ -46,8 +45,6 @@ class CurrentUserIdArgumentResolver : HandlerMethodArgumentResolver {
             header.toLongOrNull()
                 ?: throw UnauthorizedException(ErrorCode.AUTH_INVALID_TOKEN)
 
-        // users.id 는 AUTO_INCREMENT BIGINT → 항상 양수.
-        // 0 이나 음수는 Gateway 를 우회한 위조 시도로 간주.
         if (userId <= 0) {
             throw UnauthorizedException(ErrorCode.AUTH_INVALID_TOKEN)
         }

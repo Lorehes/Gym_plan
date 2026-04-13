@@ -8,7 +8,7 @@ import com.gymplan.user.application.dto.RegisterRequest
 import com.gymplan.user.application.dto.RegisterResponse
 import com.gymplan.user.application.dto.TokenRefreshResponse
 import com.gymplan.user.application.service.AuthService
-import com.gymplan.user.presentation.security.CurrentUserId
+import com.gymplan.common.security.CurrentUserId
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

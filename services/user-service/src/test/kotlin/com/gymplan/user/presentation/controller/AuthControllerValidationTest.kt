@@ -3,7 +3,7 @@ package com.gymplan.user.presentation.controller
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.gymplan.common.exception.GlobalExceptionHandler
 import com.gymplan.user.application.service.AuthService
-import com.gymplan.user.presentation.security.CurrentUserIdArgumentResolver
+import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.mock
