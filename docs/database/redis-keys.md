@@ -13,7 +13,7 @@
 | `user:session:{userId}` | String (JWT) | 액세스 토큰 세션 | 30분 |
 | `user:refresh:{tokenHash}` | String (userId) | Refresh Token | 7일 |
 | `plan:today:{userId}` | JSON (루틴 전체) | 오늘의 루틴 캐시 | 10분 (EX 600) |
-| `plan:cache:{planId}` | JSON (루틴) | 루틴 상세 캐시 | 10분 (EX 600) |
+| `plan:cache:{userId}:{planId}` | JSON (루틴) | 루틴 상세 캐시 (userId 포함으로 소유권 보장) | 10분 (EX 600) |
 | `rate:{userId}:{endpoint}` | Counter | API Rate Limiting | 1분 |
 | `rate:ip:{ip}` | Counter | IP Rate Limiting | 1분 |
 | `timer:{sessionId}:{exerciseIdx}` | pub-sub channel | 휴식 타이머 | 일시적 |
@@ -35,7 +35,7 @@ SET plan:today:{userId} {planJson} EX 600   # 10분
 
 # 루틴 수정 시 캐시 무효화
 DEL plan:today:{userId}
-DEL plan:cache:{planId}
+DEL plan:cache:{userId}:{planId}
 ```
 
 ### notification-service (휴식 타이머)

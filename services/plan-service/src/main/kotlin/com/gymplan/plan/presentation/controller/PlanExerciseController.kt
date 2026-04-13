@@ -46,7 +46,7 @@ class PlanExerciseController(
     fun reorderExercises(
         @CurrentUserId userId: Long,
         @PathVariable planId: Long,
-        @RequestBody request: ReorderExercisesRequest,
+        @Valid @RequestBody request: ReorderExercisesRequest,
     ): ApiResponse<Map<String, Boolean>> {
         planService.reorderExercises(userId, planId, request)
         return ApiResponse.success(mapOf("reordered" to true))

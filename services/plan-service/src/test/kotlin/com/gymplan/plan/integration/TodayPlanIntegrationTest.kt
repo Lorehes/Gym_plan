@@ -150,7 +150,7 @@ class TodayPlanIntegrationTest : AbstractIntegrationTest() {
 
         // 캐시 삭제 확인
         assertThat(redis.hasKey("plan:today:$userId")).isFalse()
-        assertThat(redis.hasKey("plan:cache:${plan.id}")).isFalse()
+        assertThat(redis.hasKey("plan:cache:${userId}:${plan.id}")).isFalse()
 
         // 재조회 시 수정된 이름 반환
         mockMvc.get("/api/v1/plans/today") {

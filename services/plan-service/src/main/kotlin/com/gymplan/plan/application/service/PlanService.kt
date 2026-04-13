@@ -51,17 +51,15 @@ class PlanService(
 
     @Transactional(readOnly = true)
     fun getPlan(userId: Long, planId: Long): PlanDetailResponse {
-        planCacheManager.getPlanDetail(planId)?.let {
-            verifyOwner(userId, it.planId)
-            return it
-        }
+        // 캐시 키가 userId를 포함하므로 히트 시 소유권이 이미 보장됨 — DB 조회 불필요
+        planCacheManager.getPlanDetail(userId, planId)?.let { return it }
 
-        findPlanForUser(userId, planId)
-        val response = workoutPlanRepository
-            .findWithExercisesByIdAndIsActiveTrue(planId)!!
-            .toDetailResponse()
+        val plan = workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)
+            ?: throw NotFoundException(ErrorCode.PLAN_NOT_FOUND)
+        if (plan.userId != userId) throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
 
-        planCacheManager.setPlanDetail(planId, response)
+        val response = plan.toDetailResponse()
+        planCacheManager.setPlanDetail(userId, planId, response)
         return response
     }
 
@@ -204,22 +202,11 @@ class PlanService(
 
     private fun findExerciseForPlan(planId: Long, exerciseItemId: Long): PlanExercise {
         val exercise = planExerciseRepository.findById(exerciseItemId)
-            .orElseThrow { NotFoundException(ErrorCode.PLAN_NOT_FOUND) }
+            .orElseThrow { NotFoundException(ErrorCode.EXERCISE_NOT_FOUND) }
 
         if (exercise.plan.id != planId) {
             throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
         }
         return exercise
-    }
-
-    /** getPlan 캐시 히트 경로에서 소유자 검증 */
-    private fun verifyOwner(userId: Long, cachedPlanId: Long) {
-        val plan = workoutPlanRepository.findById(cachedPlanId)
-            .filter { it.isActive }
-            .orElseThrow { NotFoundException(ErrorCode.PLAN_NOT_FOUND) }
-
-        if (plan.userId != userId) {
-            throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
-        }
     }
 }

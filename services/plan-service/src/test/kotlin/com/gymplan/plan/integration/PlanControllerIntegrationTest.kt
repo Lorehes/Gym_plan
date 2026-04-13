@@ -143,7 +143,7 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         assertThat(exercises[0].exerciseId).isEqualTo(20L)
 
         // 캐시 무효화 확인
-        assertThat(redis.hasKey("plan:cache:${plan.id}")).isFalse()
+        assertThat(redis.hasKey("plan:cache:${userId}:${plan.id}")).isFalse()
     }
 
     // ─────────────────── TC-07: orderedIds 불일치 ───────────────────

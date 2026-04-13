@@ -12,8 +12,10 @@ import java.time.Duration
  * plan-service Redis 캐시 관리.
  *
  * 키 설계 (docs/database/redis-keys.md):
- *   plan:today:{userId}  — 오늘의 루틴 전체 (TodayPlanResponse JSON), TTL 10분
- *   plan:cache:{planId}  — 루틴 상세 (PlanDetailResponse JSON),     TTL 10분
+ *   plan:today:{userId}           — 오늘의 루틴 전체 (TodayPlanResponse JSON), TTL 10분
+ *   plan:cache:{userId}:{planId}  — 루틴 상세 (PlanDetailResponse JSON),     TTL 10분
+ *
+ * plan:cache 키에 userId를 포함하여 캐시 히트 시 DB 조회 없이 소유권 보장.
  *
  * 패턴:
  *   읽기: Read-Aside (캐시 먼저 → 미스 시 DB → 캐시 저장)
@@ -56,22 +58,22 @@ class PlanCacheManager(
 
     // ───── 루틴 상세 캐시 ─────
 
-    fun getPlanDetail(planId: Long): PlanDetailResponse? {
-        val key = cacheKey(planId)
+    fun getPlanDetail(userId: Long, planId: Long): PlanDetailResponse? {
+        val key = cacheKey(userId, planId)
         val json = redis.opsForValue().get(key) ?: return null
         return runCatching {
             objectMapper.readValue(json, PlanDetailResponse::class.java)
         }.onFailure {
-            log.warn("plan:cache:{} 역직렬화 실패 — 캐시 삭제: {}", planId, it.message)
+            log.warn("plan:cache:{}:{} 역직렬화 실패 — 캐시 삭제: {}", userId, planId, it.message)
             redis.delete(key)
         }.getOrNull()
     }
 
-    fun setPlanDetail(planId: Long, response: PlanDetailResponse) {
-        val key = cacheKey(planId)
+    fun setPlanDetail(userId: Long, planId: Long, response: PlanDetailResponse) {
+        val key = cacheKey(userId, planId)
         val json = objectMapper.writeValueAsString(response)
         redis.opsForValue().set(key, json, TTL)
-        log.debug("plan:cache:{} 캐시 저장", planId)
+        log.debug("plan:cache:{}:{} 캐시 저장", userId, planId)
     }
 
     /**
@@ -79,15 +81,15 @@ class PlanCacheManager(
      * TTL 만료를 기다리지 않는다 — 체육관에서 최신 루틴 보장 필수.
      */
     fun evictPlanCaches(userId: Long, planId: Long) {
-        redis.delete(listOf(todayKey(userId), cacheKey(planId)))
-        log.debug("캐시 무효화: plan:today:{}, plan:cache:{}", userId, planId)
+        redis.delete(listOf(todayKey(userId), cacheKey(userId, planId)))
+        log.debug("캐시 무효화: plan:today:{}, plan:cache:{}:{}", userId, userId, planId)
     }
 
     // ───── 키 빌더 ─────
 
     private fun todayKey(userId: Long) = "plan:today:$userId"
 
-    private fun cacheKey(planId: Long) = "plan:cache:$planId"
+    private fun cacheKey(userId: Long, planId: Long) = "plan:cache:$userId:$planId"
 
     companion object {
         val TTL: Duration = Duration.ofMinutes(10)

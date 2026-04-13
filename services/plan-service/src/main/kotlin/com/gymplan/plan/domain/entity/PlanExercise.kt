@@ -95,9 +95,9 @@ class PlanExercise(
         muscleGroup?.let { this.muscleGroup = it }
         targetSets?.let { this.targetSets = it }
         targetReps?.let { this.targetReps = it }
-        this.targetWeight = targetWeight ?: this.targetWeight
+        this.targetWeight = targetWeight   // null 전달 시 목표 중량 초기화 허용
         restSeconds?.let { this.restSeconds = it }
-        this.notes = notes ?: this.notes
+        this.notes = notes                 // null 전달 시 노트 초기화 허용
     }
 
     fun updateOrderIndex(newIndex: Int) {

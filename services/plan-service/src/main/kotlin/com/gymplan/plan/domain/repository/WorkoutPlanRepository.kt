@@ -6,7 +6,12 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface WorkoutPlanRepository : JpaRepository<WorkoutPlan, Long> {
 
-    /** 내 루틴 목록 (soft delete 제외) */
+    /**
+     * 내 루틴 목록 (soft delete 제외).
+     * @EntityGraph 로 exercises 컬렉션을 단일 LEFT JOIN 쿼리로 로딩.
+     * toSummaryResponse()에서 exercises.size 호출 시 N+1 방지.
+     */
+    @EntityGraph(attributePaths = ["exercises"])
     fun findByUserIdAndIsActiveTrueOrderByCreatedAtDesc(userId: Long): List<WorkoutPlan>
 
     /**
