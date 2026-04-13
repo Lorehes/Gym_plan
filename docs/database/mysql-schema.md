@@ -35,6 +35,8 @@ CREATE TABLE plan_exercises (
   id            BIGINT PRIMARY KEY AUTO_INCREMENT,
   plan_id       BIGINT NOT NULL,
   exercise_id   BIGINT NOT NULL,
+  exercise_name VARCHAR(100) NOT NULL,     -- 비정규화: exercise-catalog HTTP 호출 없이 조회
+  muscle_group  VARCHAR(50)  NOT NULL,     -- 비정규화: CHEST|BACK|SHOULDERS|ARMS|LEGS|CORE|CARDIO
   order_index   INT NOT NULL,
   target_sets   INT DEFAULT 3,
   target_reps   INT DEFAULT 10,
