@@ -1,11 +1,14 @@
 package com.gymplan.common.exception
 
 import com.gymplan.common.dto.ApiResponse
+import jakarta.validation.ConstraintViolationException
 import org.slf4j.LoggerFactory
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 
 /**
  * 전역 예외 핸들러.
@@ -15,8 +18,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
  *
  * 처리 우선순위:
  *   1. GymPlanException (도메인 예외) → ErrorCode 기반 응답
- *   2. MethodArgumentNotValidException (Spring Validation 실패) → 400 + 필드 정보
- *   3. 그 외 Throwable → 500 INTERNAL_ERROR
+ *   2. MethodArgumentNotValidException (@Valid RequestBody 검증 실패) → 400 + 필드 정보
+ *   3. MethodArgumentTypeMismatchException (enum 파라미터 변환 실패) → 400
+ *   4. ConstraintViolationException (@Validated + @Max/@Min 쿼리 파라미터) → 400
+ *   5. 그 외 Throwable → 500 INTERNAL_ERROR
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -42,6 +47,19 @@ class GlobalExceptionHandler {
             )
     }
 
+    /**
+     * JSON 역직렬화 실패 (missing non-null field, 잘못된 타입 등).
+     * MissingKotlinParameterException 도 이 경로로 처리된다.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleMessageNotReadable(ex: HttpMessageNotReadableException): ResponseEntity<ApiResponse<Nothing>> {
+        log.info("[VALIDATION_FAILED] 요청 본문 파싱 실패: {}", ex.message)
+        val ec = ErrorCode.VALIDATION_FAILED
+        return ResponseEntity
+            .status(ec.status)
+            .body(ApiResponse.failure(code = ec.code, message = "요청 본문 형식이 올바르지 않습니다"))
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(ex: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Nothing>> {
         val fieldErrors: Map<String, Any?> =
@@ -58,6 +76,40 @@ class GlobalExceptionHandler {
                     code = ec.code,
                     message = ec.defaultMessage,
                     details = fieldErrors,
+                ),
+            )
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatch(ex: MethodArgumentTypeMismatchException): ResponseEntity<ApiResponse<Nothing>> {
+        val message = "유효하지 않은 ${ex.name} 값입니다: ${ex.value}"
+        log.info("[VALIDATION_FAILED] {}", message)
+        val ec = ErrorCode.VALIDATION_FAILED
+        return ResponseEntity
+            .status(ec.status)
+            .body(
+                ApiResponse.failure(
+                    code = ec.code,
+                    message = message,
+                ),
+            )
+    }
+
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handleConstraintViolation(ex: ConstraintViolationException): ResponseEntity<ApiResponse<Nothing>> {
+        val details: Map<String, Any?> =
+            ex.constraintViolations.associate { violation ->
+                violation.propertyPath.toString() to violation.message
+            }
+        log.info("[VALIDATION_FAILED] {}", details)
+        val ec = ErrorCode.VALIDATION_FAILED
+        return ResponseEntity
+            .status(ec.status)
+            .body(
+                ApiResponse.failure(
+                    code = ec.code,
+                    message = ec.defaultMessage,
+                    details = details,
                 ),
             )
     }
