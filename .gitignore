@@ -48,12 +48,8 @@ out/
 *.pem
 *.p12
 *.jks
-application-local.yml
-application-local.yaml
-application-secret.yml
-application-secret.yaml
-**/src/main/resources/application-local*.yml
-**/src/main/resources/application-secret*.yml
+*application*.yml
+*.yaml
 
 # Vault 설정/스크립트 일체 차단 (시드 토큰, 키 생성 로직 등 보안 절차 포함)
 infra/vault/
