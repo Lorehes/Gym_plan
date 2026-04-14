@@ -20,3 +20,6 @@ include("services:exercise-catalog")
 include("services:workout-service")
 include("services:analytics-service")
 include("services:notification-service")
+
+// ───── E2E 테스트 ─────
+include("e2e")
