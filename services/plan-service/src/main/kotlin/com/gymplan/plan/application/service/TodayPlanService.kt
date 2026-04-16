@@ -30,6 +30,10 @@ class TodayPlanService(
 ) {
     private val log = LoggerFactory.getLogger(TodayPlanService::class.java)
 
+    companion object {
+        private val ZONE_KST = ZoneId.of("Asia/Seoul")
+    }
+
     @Transactional(readOnly = true)
     fun getTodayPlan(userId: Long): TodayPlanResponse? {
         // 1. 캐시 조회
@@ -59,5 +63,5 @@ class TodayPlanService(
 
     /** KST 기준 오늘 요일 (0=월, 1=화, ..., 6=일) */
     private fun todayDayOfWeek(): Int =
-        LocalDate.now(ZoneId.of("Asia/Seoul")).dayOfWeek.value - 1
+        LocalDate.now(ZONE_KST).dayOfWeek.value - 1
 }
