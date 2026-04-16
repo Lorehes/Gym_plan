@@ -90,7 +90,7 @@ class WorkoutPlan(
     fun update(name: String?, description: String?, dayOfWeek: Int?) {
         name?.let { this.name = it }
         this.description = description   // null 전달 시 description 초기화 허용
-        this.dayOfWeek = dayOfWeek       // null 전달 시 무요일(null)로 변경 허용
+        dayOfWeek?.let { this.dayOfWeek = it }   // null → 기존 dayOfWeek 유지 (PATCH 의미론)
     }
 
     fun softDelete() {
