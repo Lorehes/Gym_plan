@@ -40,7 +40,9 @@ abstract class AbstractIntegrationTest {
         @DynamicPropertySource
         fun registerProperties(registry: DynamicPropertyRegistry) {
             registry.add("spring.datasource.url") {
-                "${mysql.jdbcUrl}&serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
+                val base = mysql.jdbcUrl
+                val sep = if ('?' in base) "&" else "?"
+                "${base}${sep}serverTimezone=Asia/Seoul&characterEncoding=UTF-8"
             }
             registry.add("spring.datasource.username") { mysql.username }
             registry.add("spring.datasource.password") { mysql.password }
