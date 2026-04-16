@@ -7,7 +7,7 @@
 # ==============================
 .gradle/
 build/
-!gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
@@ -149,9 +149,5 @@ docs/**/*.docx
 # ==============================
 # .claude — Claude Code 협업 자산
 # ==============================
-# CLAUDE.md (프로젝트 지침서) 와 skills/ 는 추적,
-# 나머지 (sessions, cache, todo, agent state 등) 는 모두 차단.
-.claude/*
-!.claude/CLAUDE.md
-!.claude/skills/
-.claude/skills/.DS_Store
+# 모든 .claude 파일 차단 (sessions, cache, todo, CLAUDE.md, skills 등)
+.claude/
