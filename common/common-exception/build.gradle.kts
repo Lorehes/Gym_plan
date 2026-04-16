@@ -10,6 +10,7 @@ dependencies {
     implementation("org.springframework:spring-context")
     implementation("org.slf4j:slf4j-api")
     implementation("jakarta.validation:jakarta.validation-api")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
 
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 }
