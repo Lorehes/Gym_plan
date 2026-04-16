@@ -1,5 +1,6 @@
 package com.gymplan.common.exception
 
+import com.fasterxml.jackson.databind.JsonMappingException
 import com.gymplan.common.dto.ApiResponse
 import jakarta.validation.ConstraintViolationException
 import org.slf4j.LoggerFactory
@@ -49,12 +50,24 @@ class GlobalExceptionHandler {
 
     /**
      * JSON 역직렬화 실패 (missing non-null field, 잘못된 타입 등).
-     * MissingKotlinParameterException 도 이 경로로 처리된다.
+     * MissingKotlinParameterException 은 JsonMappingException 의 서브클래스이므로
+     * path 에서 필드명을 추출해 details 에 포함한다.
      */
     @ExceptionHandler(HttpMessageNotReadableException::class)
     fun handleMessageNotReadable(ex: HttpMessageNotReadableException): ResponseEntity<ApiResponse<Nothing>> {
-        log.info("[VALIDATION_FAILED] 요청 본문 파싱 실패: {}", ex.message)
         val ec = ErrorCode.VALIDATION_FAILED
+        val cause = ex.cause
+        if (cause is JsonMappingException) {
+            val fieldName = cause.path.lastOrNull()?.fieldName
+            if (fieldName != null) {
+                val details = mapOf(fieldName to "필수 항목입니다")
+                log.info("[VALIDATION_FAILED] 필수 파라미터 누락: {}", fieldName)
+                return ResponseEntity
+                    .status(ec.status)
+                    .body(ApiResponse.failure(code = ec.code, message = ec.defaultMessage, details = details))
+            }
+        }
+        log.info("[VALIDATION_FAILED] 요청 본문 파싱 실패: {}", ex.message)
         return ResponseEntity
             .status(ec.status)
             .body(ApiResponse.failure(code = ec.code, message = "요청 본문 형식이 올바르지 않습니다"))
