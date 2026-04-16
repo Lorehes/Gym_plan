@@ -10,6 +10,8 @@
 //   ./gradlew :e2e:test -Dgroups=e2e
 // ─────────────────────────────────────────────────────────────
 
+import java.time.Duration
+
 plugins {
     kotlin("jvm")
 }
@@ -39,7 +41,11 @@ tasks.test {
     useJUnitPlatform()
 
     // E2E 테스트는 서비스 컨테이너 기동이 필요해 시간이 걸림
-    timeout.set(java.time.Duration.ofMinutes(15))
+    timeout.set(Duration.ofMinutes(15))
+
+    // Docker Desktop 최신 빌드와 API 협상 호환성 고정
+    systemProperty("api.version", "1.43")
+    environment("DOCKER_API_VERSION", "1.43")
 
     // 컨테이너 로그를 테스트 출력에서 보이게 하려면 아래 주석 해제
     // testLogging { events("passed", "skipped", "failed") }
