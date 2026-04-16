@@ -38,6 +38,7 @@ enum class ErrorCode(
     // ───── 운동 세션 (workout-service) ─────
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "운동 세션을 찾을 수 없습니다."),
     SESSION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "SESSION_ALREADY_ACTIVE", "이미 진행 중인 세션이 있습니다."),
+    SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "SESSION_ALREADY_COMPLETED", "이미 완료된 세션입니다."),
 
     // ───── Gateway / 공통 ─────
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
