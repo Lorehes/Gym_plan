@@ -40,6 +40,9 @@ enum class ErrorCode(
     SESSION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "SESSION_ALREADY_ACTIVE", "이미 진행 중인 세션이 있습니다."),
     SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "SESSION_ALREADY_COMPLETED", "이미 완료된 세션입니다."),
 
+    // ───── 알림 (notification-service) ─────
+    NOTIFICATION_ACCESS_DENIED(HttpStatus.FORBIDDEN, "NOTIFICATION_ACCESS_DENIED", "해당 세션에 대한 접근 권한이 없습니다."),
+
     // ───── Gateway / 공통 ─────
     RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMIT_EXCEEDED", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "입력값이 올바르지 않습니다."),
