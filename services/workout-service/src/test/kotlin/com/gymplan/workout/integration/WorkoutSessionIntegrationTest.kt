@@ -15,6 +15,8 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
 
 /**
  * 운동 세션 통합 테스트.
@@ -425,6 +427,73 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
         // 세션이 여전히 IN_PROGRESS 상태인지 확인
         val session = sessionRepository.findById(sessionId).orElseThrow()
         assertThat(session.completedAt).isNull()
+    }
+
+    // ─────────────────── Race Condition: pushSet 원자성 검증 ───────────────────
+
+    @Test
+    @DisplayName("Race Condition: 동시 동일 exerciseId 세트 기록 → exercises 중복 없음 (단일 원자 파이프라인 검증)")
+    fun `pushSet 동시 요청 - exercises 중복 생성 안 됨`() {
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        // 두 스레드가 동시에 같은 exerciseId로 세트 기록
+        val latch = CountDownLatch(1)
+        val futures =
+            (1..2).map { setNo ->
+                CompletableFuture.runAsync {
+                    latch.await()
+                    mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                        header("X-User-Id", userId)
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"exerciseId":"10","exerciseName":"벤치프레스","muscleGroup":"CHEST","setNo":$setNo,"reps":10,"weightKg":70.0}"""
+                    }
+                }
+            }
+
+        latch.countDown()
+        CompletableFuture.allOf(*futures.toTypedArray()).join()
+
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        // 원자적 파이프라인 업데이트로 exerciseId "10"이 반드시 1개만 존재해야 함
+        assertThat(session.exercises).hasSize(1)
+        assertThat(session.exercises[0].exerciseId).isEqualTo("10")
+        assertThat(session.exercises[0].sets).hasSize(2)
+    }
+
+    // ─────────────────── XSS 방어: notes 태그 제거 ───────────────────
+
+    @Test
+    @DisplayName("notes XSS 방어: HTML 태그 포함 입력 → 저장 시 태그 제거됨")
+    fun `notes HTML 태그 sanitize`() {
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        mockMvc.post("/api/v1/sessions/$sessionId/complete") {
+            header("X-User-Id", userId)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"notes": "<script>alert('xss')</script>오늘 컨디션 좋음"}"""
+        }.andExpect { status { isOk() } }
+
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        // script 태그 완전 제거, 순수 텍스트만 남아야 함
+        assertThat(session.notes).doesNotContain("<script>")
+        assertThat(session.notes).doesNotContain("</script>")
+        assertThat(session.notes).contains("오늘 컨디션 좋음")
     }
 
     @Test
