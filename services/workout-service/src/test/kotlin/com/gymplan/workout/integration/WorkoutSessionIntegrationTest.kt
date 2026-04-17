@@ -370,6 +370,63 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
         }
     }
 
+    // ─────────────────── TC-12: 타인 세션 접근 불가 ───────────────────
+
+    @Test
+    @DisplayName("TC-12: 타인 세션에 세트 기록 시도 → 401 (소유권 노출 방지)")
+    fun `TC-12 타인 세션 세트 기록 - 401`() {
+        // userId(1)의 세션 생성
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        // otherUserId(2)로 userId(1)의 세션에 접근
+        mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+            header("X-User-Id", otherUserId)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"exerciseId":"10","exerciseName":"벤치프레스","muscleGroup":"CHEST","setNo":1,"reps":10,"weightKg":70.0}"""
+        }.andExpect {
+            status { isUnauthorized() }
+        }
+
+        // DB에 세트가 추가되지 않았는지 확인
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        assertThat(session.exercises).isEmpty()
+    }
+
+    @Test
+    @DisplayName("TC-12: 타인 세션 완료 시도 → 401")
+    fun `TC-12 타인 세션 완료 - 401`() {
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        // otherUserId(2)로 완료 시도
+        mockMvc.post("/api/v1/sessions/$sessionId/complete") {
+            header("X-User-Id", otherUserId)
+            contentType = MediaType.APPLICATION_JSON
+            content = "{}"
+        }.andExpect {
+            status { isUnauthorized() }
+        }
+
+        // 세션이 여전히 IN_PROGRESS 상태인지 확인
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        assertThat(session.completedAt).isNull()
+    }
+
     @Test
     @DisplayName("세트 삭제 DELETE — 완료 세션이면 409")
     fun `DELETE sets - 완료 세션`() {

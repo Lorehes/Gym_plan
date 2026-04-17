@@ -2,8 +2,8 @@ package com.gymplan.workout.integration
 
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
-import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.MongoDBContainer
+import org.testcontainers.kafka.ConfluentKafkaContainer
 import org.testcontainers.utility.DockerImageName
 
 /**
@@ -20,8 +20,8 @@ abstract class AbstractIntegrationTest {
                 .apply { start() }
 
         @JvmStatic
-        val kafka: KafkaContainer =
-            KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.4.0"))
+        val kafka: ConfluentKafkaContainer =
+            ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.4.0"))
                 .apply { start() }
 
         @JvmStatic

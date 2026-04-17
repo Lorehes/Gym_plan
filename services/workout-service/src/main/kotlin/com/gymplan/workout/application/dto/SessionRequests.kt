@@ -3,6 +3,7 @@ package com.gymplan.workout.application.dto
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 
 /** POST /api/v1/sessions */
@@ -15,7 +16,7 @@ data class StartSessionRequest(
 data class LogSetRequest(
     @field:NotBlank val exerciseId: String,
     @field:NotBlank val exerciseName: String,
-    @field:NotBlank val muscleGroup: String,
+    @field:Pattern(regexp = "^(CHEST|BACK|SHOULDERS|ARMS|LEGS|CORE|CARDIO)$") val muscleGroup: String,
     @field:Min(1) val setNo: Int,
     @field:Min(1) val reps: Int,
     @field:DecimalMin(value = "0.1") val weightKg: Double,

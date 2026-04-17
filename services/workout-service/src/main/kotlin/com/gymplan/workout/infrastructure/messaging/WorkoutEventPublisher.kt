@@ -27,22 +27,26 @@ class WorkoutEventPublisher(
 
     @Async
     fun publishSetLogged(event: WorkoutSetLoggedEvent) {
-        try {
-            kafkaTemplate.send(TOPIC_SET_LOGGED, event.sessionId, event)
-            log.info("Kafka 발행: WORKOUT_SET_LOGGED sessionId={}", event.sessionId)
-        } catch (ex: Exception) {
-            log.error("Kafka 발행 실패: WORKOUT_SET_LOGGED sessionId={}", event.sessionId, ex)
-        }
+        kafkaTemplate.send(TOPIC_SET_LOGGED, event.sessionId, event)
+            .whenComplete { _, ex ->
+                if (ex != null) {
+                    log.error("Kafka 발행 실패: WORKOUT_SET_LOGGED sessionId={}", event.sessionId, ex)
+                } else {
+                    log.info("Kafka 발행 완료: WORKOUT_SET_LOGGED sessionId={}", event.sessionId)
+                }
+            }
     }
 
     @Async
     fun publishSessionCompleted(event: WorkoutSessionCompletedEvent) {
-        try {
-            kafkaTemplate.send(TOPIC_SESSION_COMPLETED, event.sessionId, event)
-            log.info("Kafka 발행: WORKOUT_SESSION_COMPLETED sessionId={}", event.sessionId)
-        } catch (ex: Exception) {
-            log.error("Kafka 발행 실패: WORKOUT_SESSION_COMPLETED sessionId={}", event.sessionId, ex)
-        }
+        kafkaTemplate.send(TOPIC_SESSION_COMPLETED, event.sessionId, event)
+            .whenComplete { _, ex ->
+                if (ex != null) {
+                    log.error("Kafka 발행 실패: WORKOUT_SESSION_COMPLETED sessionId={}", event.sessionId, ex)
+                } else {
+                    log.info("Kafka 발행 완료: WORKOUT_SESSION_COMPLETED sessionId={}", event.sessionId)
+                }
+            }
     }
 
     companion object {
