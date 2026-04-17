@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component
  * 핵심 원칙 (docs/architecture/kafka-events.md):
  *   - @Async: API 응답 후 비동기 발행 → 응답 시간에 포함하지 않음
  *   - Kafka 장애 시에도 API 응답은 성공을 반환 (try-catch로 예외 흡수)
- *   - 발행 실패는 로그로만 기록 (DLQ는 Kafka broker 설정으로 처리)
+ *   - retries=3 소진 후 최종 실패 시 {topic}.dlq 토픽으로 이동
  *
  * 토픽:
  *   - workout.set.logged       → analytics-service
@@ -30,9 +30,10 @@ class WorkoutEventPublisher(
         kafkaTemplate.send(TOPIC_SET_LOGGED, event.sessionId, event)
             .whenComplete { _, ex ->
                 if (ex != null) {
-                    log.error("Kafka 발행 실패: WORKOUT_SET_LOGGED sessionId={}", event.sessionId, ex)
+                    log.error("Kafka 발행 실패, DLQ로 이동: {} sessionId={}", TOPIC_SET_LOGGED, event.sessionId, ex)
+                    publishToDlq(TOPIC_SET_LOGGED, event.sessionId, event)
                 } else {
-                    log.info("Kafka 발행 완료: WORKOUT_SET_LOGGED sessionId={}", event.sessionId)
+                    log.info("Kafka 발행 완료: {} sessionId={}", TOPIC_SET_LOGGED, event.sessionId)
                 }
             }
     }
@@ -42,11 +43,31 @@ class WorkoutEventPublisher(
         kafkaTemplate.send(TOPIC_SESSION_COMPLETED, event.sessionId, event)
             .whenComplete { _, ex ->
                 if (ex != null) {
-                    log.error("Kafka 발행 실패: WORKOUT_SESSION_COMPLETED sessionId={}", event.sessionId, ex)
+                    log.error("Kafka 발행 실패, DLQ로 이동: {} sessionId={}", TOPIC_SESSION_COMPLETED, event.sessionId, ex)
+                    publishToDlq(TOPIC_SESSION_COMPLETED, event.sessionId, event)
                 } else {
-                    log.info("Kafka 발행 완료: WORKOUT_SESSION_COMPLETED sessionId={}", event.sessionId)
+                    log.info("Kafka 발행 완료: {} sessionId={}", TOPIC_SESSION_COMPLETED, event.sessionId)
                 }
             }
+    }
+
+    private fun publishToDlq(
+        originalTopic: String,
+        key: String,
+        event: Any,
+    ) {
+        try {
+            kafkaTemplate.send("$originalTopic.dlq", key, event)
+                .whenComplete { _, ex ->
+                    if (ex != null) {
+                        log.error("DLQ 발행도 실패 (이벤트 유실): {}.dlq key={}", originalTopic, key, ex)
+                    } else {
+                        log.warn("DLQ 발행 완료: {}.dlq key={}", originalTopic, key)
+                    }
+                }
+        } catch (e: Exception) {
+            log.error("DLQ 발행 예외 (이벤트 유실): {}.dlq key={}", originalTopic, key, e)
+        }
     }
 
     companion object {

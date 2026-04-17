@@ -15,6 +15,8 @@ import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CountDownLatch
 
 /**
  * 운동 세션 통합 테스트.
@@ -187,6 +189,51 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
             val session = sessionRepository.findById(sessionId).orElseThrow()
             assertThat(session.exercises).hasSize(1) // exercises 1개 유지
             assertThat(session.exercises[0].sets).hasSize(2) // sets에 2세트
+        }
+
+        @Test
+        @DisplayName("pushSet 파이프라인: 여러 exerciseId 중 특정 하나에 세트 추가 → 대상만 sets 증가")
+        fun `pushSet - 다중 exerciseId 중 하나에 sets append`() {
+            val sessionId = startSession()
+
+            // exerciseId "10" (벤치프레스) 1세트
+            mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"exerciseId":"10","exerciseName":"벤치프레스","muscleGroup":"CHEST","setNo":1,"reps":10,"weightKg":70.0}"""
+            }.andExpect { status { isCreated() } }
+
+            // exerciseId "20" (스쿼트) 1세트
+            mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"exerciseId":"20","exerciseName":"스쿼트","muscleGroup":"LEGS","setNo":1,"reps":10,"weightKg":80.0}"""
+            }.andExpect { status { isCreated() } }
+
+            // exerciseId "30" (데드리프트) 1세트
+            mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"exerciseId":"30","exerciseName":"데드리프트","muscleGroup":"BACK","setNo":1,"reps":5,"weightKg":100.0}"""
+            }.andExpect { status { isCreated() } }
+
+            // exerciseId "20" (스쿼트)에만 2세트 추가
+            mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"exerciseId":"20","exerciseName":"스쿼트","muscleGroup":"LEGS","setNo":2,"reps":8,"weightKg":80.0}"""
+            }.andExpect { status { isCreated() } }
+
+            val session = sessionRepository.findById(sessionId).orElseThrow()
+            assertThat(session.exercises).hasSize(3)   // exercises 3개 유지
+
+            val bench = session.exercises.first { it.exerciseId == "10" }
+            val squat = session.exercises.first { it.exerciseId == "20" }
+            val dead  = session.exercises.first { it.exerciseId == "30" }
+
+            assertThat(bench.sets).hasSize(1)  // 벤치 변화 없음
+            assertThat(squat.sets).hasSize(2)  // 스쿼트만 2세트
+            assertThat(dead.sets).hasSize(1)   // 데드 변화 없음
         }
 
         @Test
@@ -425,6 +472,112 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
         // 세션이 여전히 IN_PROGRESS 상태인지 확인
         val session = sessionRepository.findById(sessionId).orElseThrow()
         assertThat(session.completedAt).isNull()
+    }
+
+    // ─────────────────── Race Condition: pushSet 원자성 검증 ───────────────────
+
+    @Test
+    @DisplayName("Race Condition: 동시 동일 exerciseId 세트 기록 → exercises 중복 없음 (단일 원자 파이프라인 검증)")
+    fun `pushSet 동시 요청 - exercises 중복 생성 안 됨`() {
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        // 두 스레드가 동시에 같은 exerciseId로 세트 기록
+        val latch = CountDownLatch(1)
+        val futures =
+            (1..2).map { setNo ->
+                CompletableFuture.runAsync {
+                    latch.await()
+                    mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                        header("X-User-Id", userId)
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"exerciseId":"10","exerciseName":"벤치프레스","muscleGroup":"CHEST","setNo":$setNo,"reps":10,"weightKg":70.0}"""
+                    }
+                }
+            }
+
+        latch.countDown()
+        CompletableFuture.allOf(*futures.toTypedArray()).join()
+
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        // 원자적 파이프라인 업데이트로 exerciseId "10"이 반드시 1개만 존재해야 함
+        assertThat(session.exercises).hasSize(1)
+        assertThat(session.exercises[0].exerciseId).isEqualTo("10")
+        assertThat(session.exercises[0].sets).hasSize(2)
+    }
+
+    @Test
+    @DisplayName("Race Condition: 서로 다른 exerciseId 동시 요청 → exercises 각각 1개씩 정상 추가")
+    fun `pushSet 동시 요청 - 서로 다른 exerciseId 각각 추가`() {
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        // 두 스레드가 서로 다른 exerciseId로 동시 요청 — 둘 다 신규 exercise 삽입 경로
+        val latch = CountDownLatch(1)
+        val futures =
+            listOf("10" to "벤치프레스" to "CHEST", "20" to "스쿼트" to "LEGS").map { (idName, muscle) ->
+                val (exId, exName) = idName
+                CompletableFuture.runAsync {
+                    latch.await()
+                    mockMvc.post("/api/v1/sessions/$sessionId/sets") {
+                        header("X-User-Id", userId)
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"exerciseId":"$exId","exerciseName":"$exName","muscleGroup":"$muscle","setNo":1,"reps":10,"weightKg":70.0}"""
+                    }
+                }
+            }
+
+        latch.countDown()
+        CompletableFuture.allOf(*futures.toTypedArray()).join()
+
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        // 원자 파이프라인으로 두 exercise가 각각 정확히 1개씩 존재해야 함
+        assertThat(session.exercises).hasSize(2)
+        assertThat(session.exercises.map { it.exerciseId }).containsExactlyInAnyOrder("10", "20")
+        session.exercises.forEach { assertThat(it.sets).hasSize(1) }
+    }
+
+    // ─────────────────── XSS 방어: notes 태그 제거 ───────────────────
+
+    @Test
+    @DisplayName("notes XSS 방어(HtmlUtils.htmlEscape): HTML 특수문자 → 엔티티로 이스케이프")
+    fun `notes HTML 이스케이프`() {
+        val startResult =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andReturn()
+        val sessionId =
+            com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(startResult.response.contentAsString)["data"]["sessionId"].asText()
+
+        mockMvc.post("/api/v1/sessions/$sessionId/complete") {
+            header("X-User-Id", userId)
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"notes": "<script>alert('xss')</script>오늘 컨디션 좋음"}"""
+        }.andExpect { status { isOk() } }
+
+        val session = sessionRepository.findById(sessionId).orElseThrow()
+        // < > ' 모두 HTML 엔티티로 이스케이프되어 저장 → raw tag 없음
+        assertThat(session.notes).doesNotContain("<script>")
+        assertThat(session.notes).doesNotContain("</script>")
+        assertThat(session.notes).contains("&lt;script&gt;")
+        assertThat(session.notes).contains("오늘 컨디션 좋음")
     }
 
     @Test

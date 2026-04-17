@@ -16,9 +16,9 @@ import java.time.Instant
  *
  * 핵심 원칙: 전체 문서 교체(save) 대신 $push로 배열에 append.
  *
- * pushSet 두 단계:
- *   1. exercises.$.sets 에 $push (exerciseId 존재 시)
- *   2. modifiedCount == 0이면 exercises 배열에 새 SessionExercise $push
+ * pushSet — 단일 원자적 파이프라인 업데이트 (MongoDB 4.2+):
+ *   $cond로 exerciseId 존재 여부를 판단, 두 경로(기존 exercise / 신규 exercise)를
+ *   한 번의 왕복으로 처리하여 Race Condition(중복 exercise 삽입) 원천 차단.
  */
 class WorkoutSessionRepositoryImpl(
     private val mongoTemplate: MongoTemplate,
@@ -32,38 +32,56 @@ class WorkoutSessionRepositoryImpl(
         set: SetRecord,
     ): Long {
         val setDoc = set.toDocument()
-
-        // 시도 1: 이미 존재하는 exerciseId의 sets 배열에 $push
-        val existingExerciseQuery =
-            Query(
-                Criteria.where("_id").`is`(ObjectId(sessionId))
-                    .and("userId").`is`(userId)
-                    .and("completedAt").isNull
-                    .and("exercises.exerciseId").`is`(exerciseId),
-            )
-        val pushToExistingUpdate = Update().push("exercises.\$.sets", setDoc)
-        val result1 = mongoTemplate.updateFirst(existingExerciseQuery, pushToExistingUpdate, COLLECTION)
-
-        if (result1.modifiedCount > 0) return result1.modifiedCount
-
-        // 시도 2: exerciseId가 없으므로 새 SessionExercise를 exercises 배열에 $push
-        val newExerciseQuery =
-            Query(
-                Criteria.where("_id").`is`(ObjectId(sessionId))
-                    .and("userId").`is`(userId)
-                    .and("completedAt").isNull,
-            )
-        val newExercise =
+        val newExerciseDoc =
             SessionExercise(
                 exerciseId = exerciseId,
                 exerciseName = exerciseName,
                 muscleGroup = muscleGroup,
                 sets = listOf(set),
             ).toDocument()
-        val pushNewExerciseUpdate = Update().push("exercises", newExercise)
-        val result2 = mongoTemplate.updateFirst(newExerciseQuery, pushNewExerciseUpdate, COLLECTION)
 
-        return result2.modifiedCount
+        // 단일 원자적 aggregation pipeline update
+        // - exerciseId 존재 시: $map으로 해당 exercise의 sets에 새 세트 $concatArrays
+        // - exerciseId 없을 시: exercises 배열에 새 exercise $concatArrays
+        val pipeline =
+            listOf(
+                Document(
+                    "\$set",
+                    Document(
+                        "exercises",
+                        Document("\$cond", Document()
+                            .append("if", Document("\$in", listOf(exerciseId, "\$exercises.exerciseId")))
+                            .append("then",
+                                Document("\$map", Document()
+                                    .append("input", "\$exercises")
+                                    .append("as", "ex")
+                                    .append("in", Document("\$cond", Document()
+                                        .append("if", Document("\$eq", listOf("\$\$ex.exerciseId", exerciseId)))
+                                        .append("then", Document("\$mergeObjects", listOf(
+                                            "\$\$ex",
+                                            Document("sets", Document("\$concatArrays",
+                                                listOf("\$\$ex.sets", listOf(setDoc))
+                                            )),
+                                        )))
+                                        .append("else", "\$\$ex")
+                                    )),
+                                ),
+                            )
+                            .append("else", Document("\$concatArrays",
+                                listOf("\$exercises", listOf(newExerciseDoc))
+                            )),
+                        ),
+                    ),
+                ),
+            )
+
+        val filter =
+            Document("_id", ObjectId(sessionId))
+                .append("userId", userId)
+                .append("completedAt", null)
+
+        val result = mongoTemplate.getCollection(COLLECTION).updateOne(filter, pipeline)
+        return result.modifiedCount
     }
 
     override fun updateSet(
