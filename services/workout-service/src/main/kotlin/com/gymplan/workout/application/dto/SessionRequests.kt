@@ -16,7 +16,9 @@ data class StartSessionRequest(
 data class LogSetRequest(
     @field:NotBlank val exerciseId: String,
     @field:NotBlank val exerciseName: String,
-    @field:Pattern(regexp = "^(CHEST|BACK|SHOULDERS|ARMS|LEGS|CORE|CARDIO)$") val muscleGroup: String,
+    @field:NotBlank
+    @field:Pattern(regexp = "^(CHEST|BACK|SHOULDERS|ARMS|LEGS|CORE|CARDIO)$")
+    val muscleGroup: String,
     @field:Min(1) val setNo: Int,
     @field:Min(1) val reps: Int,
     @field:DecimalMin(value = "0.1") val weightKg: Double,
