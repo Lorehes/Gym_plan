@@ -21,11 +21,8 @@ import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -115,7 +112,9 @@ public class AnalyticsQueryService {
                                 .calendarInterval(CalendarInterval.Day)
                                 .format("yyyy-MM-dd"))
                         .aggregations("daily_volume", Aggregation.of(sub -> sub.sum(s -> s.field("volume"))))
-                        .aggregations("muscle_terms", Aggregation.of(sub -> sub.terms(t -> t.field("muscleGroup").size(10))))))
+                        .aggregations("muscle_terms", Aggregation.of(sub -> sub
+                                .terms(t -> t.field("muscleGroup").size(10))
+                                .aggregations("per_muscle_volume", Aggregation.of(mv -> mv.sum(s -> s.field("volume"))))))))
                 .withMaxResults(0)
                 .build();
 
@@ -141,7 +140,8 @@ public class AnalyticsQueryService {
                 List<StringTermsBucket> muscleBuckets =
                         bucket.aggregations().get("muscle_terms").sterms().buckets().array();
                 for (StringTermsBucket mb : muscleBuckets) {
-                    result.add(new VolumeDataPoint(date, mb.key().stringValue(), mb.docCount()));
+                    double muscleVol = mb.aggregations().get("per_muscle_volume").sum().value();
+                    result.add(new VolumeDataPoint(date, mb.key().stringValue(), muscleVol));
                 }
             }
         }

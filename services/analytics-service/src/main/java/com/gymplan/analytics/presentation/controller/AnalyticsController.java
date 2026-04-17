@@ -10,6 +10,7 @@ import com.gymplan.common.dto.ApiResponse;
 import com.gymplan.common.security.CurrentUserId;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,7 +71,7 @@ public class AnalyticsController {
     @GetMapping("/frequency")
     public ResponseEntity<ApiResponse<Map<String, FrequencyDayData>>> getFrequency(
             @CurrentUserId long userId,
-            @RequestParam int year,
+            @RequestParam @Min(2020) @Max(2099) int year,
             @RequestParam @Min(1) @Max(12) int month) {
         Map<String, FrequencyDayData> data = queryService.getFrequency(String.valueOf(userId), year, month);
         return ResponseEntity.ok(ApiResponse.Companion.success(data));

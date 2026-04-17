@@ -78,11 +78,10 @@ public class KafkaConsumerConfig {
         return new KafkaTemplate<>(dlqProducerFactory());
     }
 
-    @SuppressWarnings("unchecked")
     @Bean
     public DefaultErrorHandler errorHandler(KafkaTemplate<String, String> dlqKafkaTemplate) {
         var recoverer = new DeadLetterPublishingRecoverer(
-                (KafkaTemplate) dlqKafkaTemplate,
+                dlqKafkaTemplate,
                 (record, ex) -> new TopicPartition(record.topic() + ".dlq", record.partition())
         );
 
