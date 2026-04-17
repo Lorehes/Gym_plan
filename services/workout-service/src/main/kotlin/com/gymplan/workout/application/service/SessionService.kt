@@ -17,10 +17,10 @@ import com.gymplan.workout.application.event.WorkoutSessionCompletedEvent
 import com.gymplan.workout.domain.entity.WorkoutSession
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import com.gymplan.workout.infrastructure.messaging.WorkoutEventPublisher
-import org.owasp.html.HtmlPolicyBuilder
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
+import org.springframework.web.util.HtmlUtils
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -40,8 +40,6 @@ class SessionService(
 ) {
     private val log = LoggerFactory.getLogger(SessionService::class.java)
 
-    // notes 필드: 모든 HTML 태그 제거 (XSS 방어, 명세 §보안)
-    private val notesPolicy = HtmlPolicyBuilder().toFactory()
 
     // ─────────────────── 세션 시작 ───────────────────
 
@@ -100,8 +98,10 @@ class SessionService(
                 ex.sets.sumOf { s -> s.weightKg * s.reps }
             }
 
-        // notes: HTML 태그 전부 제거 (저장 전 서버 측 XSS 방어)
-        val sanitizedNotes = request.notes?.let { notesPolicy.sanitize(it) }
+        // notes: HTML 특수문자 이스케이프 (서버 측 XSS 방어, 명세 §보안)
+        // OWASP sanitizer 대신 HtmlUtils 사용 — 운동 기록에 "<", ">" 비교 표현이 빈번하여
+        // HTML 파서 기반 태그 제거 시 한국어 텍스트 소실 위험 존재
+        val sanitizedNotes = request.notes?.let { HtmlUtils.htmlEscape(it) }
 
         // completedAt = null 조건 포함 → DB 레벨 중복 완료 방지 (동시성 안전)
         val modified =
