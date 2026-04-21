@@ -31,3 +31,14 @@ dependencies {
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
     testImplementation("org.testcontainers:junit-jupiter")
 }
+
+// Testcontainers BOM override: Spring Boot 3.3.5 고정값(1.19.8)이 macOS Docker Desktop 4.68+ 와
+// API 버전 협상 실패("client version 1.32 too old")하므로 1.20.4로 오버라이드
+dependencyManagement {
+    imports { mavenBom("org.testcontainers:testcontainers-bom:1.20.4") }
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("api.version", "1.43")
+    environment("DOCKER_API_VERSION", "1.43")
+}

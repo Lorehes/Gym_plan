@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Criteria
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.mongodb.core.query.Update
+import org.springframework.stereotype.Component
 import java.time.Instant
 
 /**
@@ -20,6 +21,7 @@ import java.time.Instant
  *   $cond로 exerciseId 존재 여부를 판단, 두 경로(기존 exercise / 신규 exercise)를
  *   한 번의 왕복으로 처리하여 Race Condition(중복 exercise 삽입) 원천 차단.
  */
+@Component
 class WorkoutSessionRepositoryImpl(
     private val mongoTemplate: MongoTemplate,
 ) : WorkoutSessionRepositoryCustom {

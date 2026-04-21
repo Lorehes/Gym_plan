@@ -64,7 +64,7 @@ public class PersonalRecordService {
                 "weightKg",   weightKg,
                 "reps",       reps,
                 "isReliable", isReliable,
-                "achievedAt", occurredAt.toString()
+                "achievedAt", occurredAt.toEpochMilli()
         );
 
         // 문서 없을 때 사용할 초기 upsert 문서
@@ -76,7 +76,7 @@ public class PersonalRecordService {
                 "maxReps",      reps,
                 "estimated1RM", estimated1RM,
                 "isReliable",   isReliable,
-                "achievedAt",   occurredAt.toString()
+                "achievedAt",   occurredAt.toEpochMilli()
         ));
 
         UpdateQuery updateQuery = UpdateQuery.builder(docId)

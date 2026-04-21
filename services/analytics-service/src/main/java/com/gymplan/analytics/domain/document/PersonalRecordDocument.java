@@ -15,7 +15,7 @@ import java.time.Instant;
  * 문서 ID: {userId}-{exerciseId}  → 유저×종목 조합당 1건
  * 갱신 조건: estimated1RM이 기존보다 클 때만 upsert
  */
-@Document(indexName = "gymplan-personal-records", createIndex = false)
+@Document(indexName = "gymplan-personal-records", createIndex = true)
 public class PersonalRecordDocument {
 
     @Id
@@ -42,7 +42,7 @@ public class PersonalRecordDocument {
     @Field(type = FieldType.Boolean)
     private Boolean isReliable;
 
-    @Field(type = FieldType.Date, format = DateFormat.date_time)
+    @Field(type = FieldType.Date, format = DateFormat.epoch_millis)
     private Instant achievedAt;
 
     public PersonalRecordDocument() {}
