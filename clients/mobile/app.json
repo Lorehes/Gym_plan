@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "GymPlan",
+    "slug": "gymplan-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "gymplan",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "io.gymplan.mobile"
+    },
+    "android": {
+      "package": "io.gymplan.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A"
+      }
+    },
+    "splash": {
+      "backgroundColor": "#0A0A0A",
+      "resizeMode": "contain"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiBaseUrl": {
+        "development": "http://localhost:8080/api/v1",
+        "production": "https://api.gymplan.io/api/v1"
+      }
+    }
+  }
+}
