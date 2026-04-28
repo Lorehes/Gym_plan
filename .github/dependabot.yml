@@ -1,0 +1,152 @@
+# ==============================
+# Dependabot — 의존성 자동 업데이트 PR
+# ==============================
+# 정책:
+#   - 매주 월요일 09:00 KST 에 보안/마이너 업데이트 PR
+#   - target-branch: develop (직접 main 에 PR 하지 않음)
+#   - 그룹화: spring/react/jest 등은 묶어서 PR 1개로 (PR noise 감소)
+#   - 동시 열린 PR 한도: gradle 5 / npm 5 / docker 3
+#
+# 참고: docs/context/security-guide.md "A06 Vulnerable Components" 대응 자동화
+
+version: 2
+
+updates:
+  # ─── Gradle (백엔드 + 공통 + e2e) ────────────────────────
+  - package-ecosystem: gradle
+    directories:
+      - "/"
+      - "/common/common-dto"
+      - "/common/common-exception"
+      - "/common/common-security"
+      - "/services/api-gateway"
+      - "/services/user-service"
+      - "/services/plan-service"
+      - "/services/exercise-catalog"
+      - "/services/workout-service"
+      - "/services/analytics-service"
+      - "/services/notification-service"
+      - "/e2e"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    target-branch: develop
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      spring:
+        patterns:
+          - "org.springframework.boot:*"
+          - "org.springframework.cloud:*"
+          - "org.springframework:*"
+          - "org.springframework.security:*"
+          - "org.springframework.data:*"
+          - "org.springframework.kafka:*"
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin:*"
+          - "org.jetbrains.kotlinx:*"
+      jackson:
+        patterns:
+          - "com.fasterxml.jackson*"
+      testing:
+        patterns:
+          - "org.junit.jupiter:*"
+          - "org.junit.platform:*"
+          - "org.assertj:*"
+          - "org.mockito:*"
+          - "io.mockk:*"
+          - "org.testcontainers:*"
+          - "io.rest-assured:*"
+      observability:
+        patterns:
+          - "io.micrometer:*"
+          - "io.opentelemetry:*"
+
+  # ─── npm (모바일 React Native) ───────────────────────────
+  - package-ecosystem: npm
+    directory: "/clients/mobile"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    target-branch: develop
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - mobile
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      expo:
+        patterns:
+          - "expo"
+          - "expo-*"
+          - "@expo/*"
+      react:
+        patterns:
+          - "react"
+          - "react-*"
+          - "@react-*/*"
+      tanstack:
+        patterns:
+          - "@tanstack/*"
+      testing:
+        patterns:
+          - "jest"
+          - "jest-*"
+          - "@testing-library/*"
+      types:
+        patterns:
+          - "@types/*"
+
+  # ─── Docker (서비스 base image) ──────────────────────────
+  # analytics-service, notification-service 는 Dockerfile 부재 (현재 컨테이너화 미진).
+  # 추가 시 이 목록에 directory 추가.
+  - package-ecosystem: docker
+    directories:
+      - "/services/api-gateway"
+      - "/services/user-service"
+      - "/services/plan-service"
+      - "/services/exercise-catalog"
+      - "/services/workout-service"
+      - "/infra/docker-compose/elasticsearch"
+    schedule:
+      interval: monthly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    target-branch: develop
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - infrastructure
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+
+  # ─── GitHub Actions (향후 워크플로우 추가 시 자동 적용) ────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    target-branch: develop
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
