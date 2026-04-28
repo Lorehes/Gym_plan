@@ -43,13 +43,135 @@ out/
 .env
 .env.*
 .env.example
+**/.env
+**/.env.*
 **/.env.example
 *.key
 *.pem
 *.p12
 *.jks
-*application*.yml
-*.yaml
+*.p8
+*.pfx
+*.crt
+*.cer
+*.der
+
+# ── Spring Boot application-*.yml 차단 정책 ──
+# 일반 application.yml / application-{env}.yml 은 ${ENV_VAR} 참조만 사용 → 추적 허용.
+# 시크릿이 들어갈 가능성이 있는 변형은 광범위하게 차단 (편집증적 안전망).
+application-local.yml
+application-local.yaml
+application-secret.yml
+application-secret.yaml
+application-secrets.yml
+application-secrets.yaml
+application-private.yml
+application-private.yaml
+application-personal.yml
+application-personal.yaml
+**/application-local.yml
+**/application-local.yaml
+**/application-secret.yml
+**/application-secret.yaml
+**/application-secrets.yml
+**/application-secrets.yaml
+**/application-private.yml
+**/application-private.yaml
+**/application-personal.yml
+**/application-personal.yaml
+**/application-*-secret.yml
+**/application-*-secret.yaml
+**/application-*-secrets.yml
+**/application-*-secrets.yaml
+**/application-*-private.yml
+**/application-*-private.yaml
+
+# ── 시크릿 명명 규칙 광범위 차단 ──
+# 파일명에 secret / secrets / private / credential 이 prefix·중간·suffix 어디든 포함되면
+# 설정 파일 확장자 (yml/yaml/json/properties/conf/env) 는 무조건 차단.
+# 코드 파일 (.kt/.java/.ts) 은 SecretManager 같은 정상 클래스명을 살리기 위해 제외.
+*secret*.yml
+*secret*.yaml
+*secret*.json
+*secret*.properties
+*secret*.conf
+*secret*.env
+*secrets*.yml
+*secrets*.yaml
+*secrets*.json
+*secrets*.properties
+*secrets*.conf
+*secrets*.env
+*credential*.yml
+*credential*.yaml
+*credential*.json
+*credential*.properties
+*credentials*.yml
+*credentials*.yaml
+*credentials*.json
+*credentials*.properties
+*creds*.yml
+*creds*.yaml
+*creds*.json
+*creds*.properties
+*apikey*.yml
+*apikey*.yaml
+*apikey*.json
+*api-key*.yml
+*api-key*.yaml
+*api-key*.json
+*api_key*.yml
+*api_key*.yaml
+*api_key*.json
+*-token.yml
+*-token.yaml
+*-token.json
+*-key.json
+*-private.yml
+*-private.yaml
+*-private.json
+*.private.yml
+*.private.yaml
+*.private.json
+**/secret.json
+**/secrets.json
+**/secret.yml
+**/secrets.yml
+**/secret.yaml
+**/secrets.yaml
+**/credentials.json
+**/credentials.yml
+**/credentials.yaml
+
+# ── 시크릿 디렉토리 차단 ──
+secret/
+secrets/
+**/secret/
+**/secrets/
+**/.secrets/
+**/.secret/
+
+# ── 클라우드/외부 서비스 자격증명 패턴 ──
+**/firebase-adminsdk*.json
+**/google-services*.json
+**/GoogleService-Info.plist
+**/serviceAccountKey*.json
+**/aws-credentials*
+**/gcp-service-account*.json
+.aws/
+.kube/
+*.kubeconfig
+.netrc
+
+# ── SSH/GPG 키 ──
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+*.gpg
+*.asc
 
 # Vault 설정/스크립트 일체 차단 (시드 토큰, 키 생성 로직 등 보안 절차 포함)
 infra/vault/
@@ -142,8 +264,8 @@ vault-token
 # ==============================
 # Docs
 # ==============================
-# docs/ 는 1인 개발 + Claude 협업 컨텍스트로 추적한다.
-# 단, 변환된 바이너리 명세는 차단.
+# 1인 개발 + Claude 협업 컨텍스트로만 사용 — 디스크에서 관리하고 git 에는 올리지 않는다.
+# (Spec, 아키텍처 문서, backlog 등은 로컬 컨텍스트이므로 외부 공유 대상 아님)
 docs/
 
 # ==============================

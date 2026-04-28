@@ -1,0 +1,32 @@
+image:
+  repository: ghcr.io/lorehes/gymplan/workout-service
+
+service:
+  port: 8084
+  targetPort: 8084
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 384Mi
+  limits:
+    cpu: 1000m
+    memory: 768Mi
+
+vault:
+  role: gymplan-workout-service
+  agentEnvTemplate: |
+    {{- with secret "secret/data/gymplan/workout-service" -}}
+    export MONGODB_URI='mongodb://gymplan:{{ .Data.data.mongo-password }}@mongodb.gymplan-prod.svc.cluster.local:27017/gymplan_workout?authSource=gymplan_workout'
+    {{- end }}
+    {{- with secret "secret/data/gymplan/kafka" -}}
+    export KAFKA_USERNAME='{{ .Data.data.username }}'
+    export KAFKA_PASSWORD='{{ .Data.data.password }}'
+    {{- end }}
+    {{- with secret "secret/data/gymplan/jwt" -}}
+    export JWT_PUBLIC_KEY='{{ .Data.data.public-key }}'
+    {{- end }}
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: k8s

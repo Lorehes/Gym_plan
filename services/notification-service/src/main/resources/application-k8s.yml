@@ -1,0 +1,29 @@
+# K8s 프로덕션 프로파일 — Vault Agent가 /vault/secrets/env.sh 에 시크릿 주입
+# SPRING_PROFILES_ACTIVE=k8s 로 활성화
+
+spring:
+  data:
+    redis:
+      host: redis.gymplan-prod.svc.cluster.local
+      port: 6379
+      # REDIS_PASSWORD: Vault Agent가 env.sh 통해 주입
+
+  kafka:
+    bootstrap-servers: kafka.gymplan-prod.svc.cluster.local:9092
+    consumer:
+      properties:
+        sasl.mechanism: SCRAM-SHA-512
+        security.protocol: SASL_SSL
+        sasl.jaas.config: >
+          org.apache.kafka.common.security.scram.ScramLoginModule required
+          username="${KAFKA_USERNAME}"
+          password="${KAFKA_PASSWORD}";
+        # KAFKA_USERNAME, KAFKA_PASSWORD: Vault Agent가 env.sh 통해 주입
+
+# FCM_SERVICE_ACCOUNT_PATH: /vault/secrets/fcm-sa.json (env.sh에서 주입)
+# fcm.service-account-path는 application.yml의 ${FCM_SERVICE_ACCOUNT_PATH}가 참조
+
+management:
+  endpoint:
+    health:
+      show-details: never

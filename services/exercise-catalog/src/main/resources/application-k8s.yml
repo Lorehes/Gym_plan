@@ -1,0 +1,25 @@
+# K8s 프로덕션 프로파일 — Vault Agent가 /vault/secrets/env.sh 에 시크릿 주입
+# SPRING_PROFILES_ACTIVE=k8s 로 활성화
+
+spring:
+  datasource:
+    url: jdbc:mysql://mysql.gymplan-prod.svc.cluster.local:3306/gymplan_exercise?useSSL=true&serverTimezone=UTC&characterEncoding=UTF-8&requireSSL=true
+    username: gymplan
+    # DB_PASSWORD: Vault Agent가 env.sh 통해 주입
+
+  elasticsearch:
+    uris: http://elasticsearch.gymplan-prod.svc.cluster.local:9200
+    username: ${ES_USERNAME}
+    password: ${ES_PASSWORD}
+    # ES_USERNAME, ES_PASSWORD: Vault Agent가 env.sh 통해 주입
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+# JWT_PUBLIC_KEY: Vault Agent가 env.sh 통해 주입
+
+management:
+  endpoint:
+    health:
+      show-details: never

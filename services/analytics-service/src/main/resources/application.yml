@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: analytics-service
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    socket-timeout: 10s
+    connection-timeout: 1s
+
+  # Spring Security 자동 등록 BasicAuth 사용자 무력화 (SecurityConfig 에서 httpBasic 비활성).
+  # 더미 password 를 두지 않는 이유: 시크릿 스캐너가 false positive 로 잡거나
+  # 향후 누군가 진짜 패스워드로 오인해 채워 넣는 것을 방지.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+server:
+  port: 8085
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.gymplan.analytics: INFO
+    org.springframework.kafka: WARN
+    org.springframework.data.elasticsearch: WARN

@@ -1,0 +1,32 @@
+# K8s 프로덕션 프로파일 — Vault Agent가 /vault/secrets/env.sh 에 시크릿 주입
+# SPRING_PROFILES_ACTIVE=k8s 로 활성화
+
+spring:
+  data:
+    mongodb:
+      # MONGODB_URI: Vault Agent 템플릿이 mongo-password를 포함한 전체 URI로 조합하여 주입
+      uri: ${MONGODB_URI}
+      auto-index-creation: false
+
+  kafka:
+    bootstrap-servers: kafka.gymplan-prod.svc.cluster.local:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: 1
+      retries: 3
+      properties:
+        sasl.mechanism: SCRAM-SHA-512
+        security.protocol: SASL_SSL
+        sasl.jaas.config: >
+          org.apache.kafka.common.security.scram.ScramLoginModule required
+          username="${KAFKA_USERNAME}"
+          password="${KAFKA_PASSWORD}";
+        # KAFKA_USERNAME, KAFKA_PASSWORD: Vault Agent가 env.sh 통해 주입
+
+# JWT_PUBLIC_KEY: Vault Agent가 env.sh 통해 주입
+
+management:
+  endpoint:
+    health:
+      show-details: never

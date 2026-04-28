@@ -1,0 +1,24 @@
+image:
+  repository: ghcr.io/lorehes/gymplan/exercise-catalog
+
+service:
+  port: 8083
+  targetPort: 8083
+
+vault:
+  role: gymplan-exercise-catalog
+  agentEnvTemplate: |
+    {{- with secret "secret/data/gymplan/exercise-catalog" -}}
+    export DB_PASSWORD='{{ .Data.data.db-password }}'
+    {{- end }}
+    {{- with secret "secret/data/gymplan/elasticsearch" -}}
+    export ES_USERNAME='{{ .Data.data.username }}'
+    export ES_PASSWORD='{{ .Data.data.password }}'
+    {{- end }}
+    {{- with secret "secret/data/gymplan/jwt" -}}
+    export JWT_PUBLIC_KEY='{{ .Data.data.public-key }}'
+    {{- end }}
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: k8s

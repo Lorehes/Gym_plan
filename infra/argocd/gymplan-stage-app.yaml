@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gymplan-stage
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: gymplan
+  source:
+    repoURL: https://github.com/Lorehes/Gym_plan.git
+    targetRevision: develop
+    path: infra/k8s/overlays/stage
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gymplan-stage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false   # GoCD 배포 중 ArgoCD 자동 self-heal 비활성화
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 120s
+  revisionHistoryLimit: 5

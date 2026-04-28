@@ -1,0 +1,21 @@
+format_version: 10
+
+# ─────────────────────────────────────────────
+# GoCD Environment: gymplan-prod
+# · deploy-prod Stage 에서만 사용하는 환경변수
+# · prod 시크릿은 stage 시크릿과 별도 Vault 경로로 격리
+# ─────────────────────────────────────────────
+environments:
+  gymplan-prod:
+    environment_variables:
+      PROD_NAMESPACE: gymplan-prod
+      PROD_GATEWAY_URL: https://api.gymplan.app
+      ARGOCD_SERVER: argocd.gymplan.internal
+      IMAGE_REGISTRY: ghcr.io/lorehes
+      KUBE_CONTEXT_PROD: gymplan-prod
+    secure_variables:
+      ARGOCD_AUTH_TOKEN: "{{VAULT:secret/gocd/argocd-auth-token-prod}}"
+      KUBECONFIG: "{{VAULT:secret/gocd/kubeconfig-prod}}"
+      SLACK_WEBHOOK_URL: "{{VAULT:secret/gocd/slack-webhook}}"
+    pipelines:
+      - gymplan-deploy

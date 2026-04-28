@@ -1,0 +1,113 @@
+# =============================================================================
+# Gateway — 외부 트래픽 진입점 (Istio Ingress Gateway)
+#
+# 아키텍처 (docs/architecture/system-architecture.md):
+#   Client (HTTPS) → Istio Ingress Gateway (TLS 종료)
+#                  → api-gateway (mTLS, :8080)
+#                  → 각 하위 서비스 (mTLS)
+#
+# TLS 종료 전략:
+#   - 외부: HTTPS (TLS SIMPLE) — cert-manager가 발급한 gymplan-tls-cert 사용
+#   - 내부: Istio mTLS (ISTIO_MUTUAL) — PeerAuthentication STRICT 적용
+#   - HTTP → HTTPS 자동 리다이렉트
+#
+# 전제조건:
+#   kubectl create secret tls gymplan-tls-cert \
+#     --cert=fullchain.pem --key=privkey.pem \
+#     -n istio-system
+#   또는 cert-manager Certificate 리소스로 자동 갱신 구성
+# =============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: gymplan-ingress-gateway
+  # Gateway는 istio-system 또는 gymplan-prod에 둘 수 있다.
+  # Istio 1.6+ 에서는 서비스 소유 네임스페이스(gymplan-prod)에 두는 것이 권장된다.
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/managed-by: argocd
+spec:
+  selector:
+    # istio-system 네임스페이스의 기본 Ingress Gateway Pod 선택
+    istio: ingressgateway
+  servers:
+    # ── HTTPS (443) ──────────────────────────────────────────
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        # cert-manager 또는 수동으로 생성한 TLS Secret (istio-system 네임스페이스)
+        credentialName: gymplan-tls-cert
+      hosts:
+        - "api.gymplan.io"
+        - "gymplan.io"
+
+    # ── HTTP (80) — HTTPS 리다이렉트 ────────────────────────
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "api.gymplan.io"
+        - "gymplan.io"
+      tls:
+        # 모든 HTTP 요청을 HTTPS로 리다이렉트 (301)
+        httpsRedirect: true
+
+---
+# =============================================================================
+# VirtualService — Ingress Gateway → api-gateway 라우팅
+#
+# 외부에서 들어오는 모든 요청은 api-gateway(8080)로 집중된다.
+# api-gateway가 JWT 검증 + Rate Limiting 후 각 서비스로 라우팅한다.
+#
+# 경로 접두사별 라우팅은 api-gateway의 Spring Cloud Gateway 설정이 담당하므로
+# Istio 레이어에서는 단순히 api-gateway Pod로 전달하면 된다.
+# =============================================================================
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: gymplan-ingress
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/managed-by: argocd
+spec:
+  hosts:
+    - "api.gymplan.io"
+    - "gymplan.io"
+  gateways:
+    - gymplan-ingress-gateway
+  http:
+    # ── 헬스체크 (모니터링 시스템용, 짧은 타임아웃) ──────────
+    - match:
+        - uri:
+            exact: /actuator/health
+      timeout: 3s
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+            subset: v1
+
+    # ── 기본 라우트 (모든 트래픽 → api-gateway) ─────────────
+    - timeout: 10s
+      # Ingress 레이어 재시도:
+      #   - connect-failure: Ingress Gateway → api-gateway Pod 연결 실패
+      #   - retriable-4xx: 응답 전 연결이 끊어진 경우 (실제 4xx는 재시도 안 함)
+      retries:
+        attempts: 2
+        perTryTimeout: 5s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+            subset: v1

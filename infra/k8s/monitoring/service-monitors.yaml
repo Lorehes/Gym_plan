@@ -1,0 +1,134 @@
+# ─────────────────────────────────────────────
+# gymplan 서비스 공통 ServiceMonitor
+# Spring Boot Actuator /actuator/prometheus 엔드포인트 수집
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gymplan-services
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  namespaceSelector:
+    matchNames:
+      - gymplan-prod
+  selector:
+    matchLabels:
+      monitoring: gymplan
+  endpoints:
+    - port: http
+      path: /actuator/prometheus
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: true
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_label_app]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+---
+# ─────────────────────────────────────────────
+# Kafka 메트릭 (kafka-exporter)
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kafka-exporter
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  namespaceSelector:
+    matchNames:
+      - gymplan-infra
+  selector:
+    matchLabels:
+      app: kafka-exporter
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+# ─────────────────────────────────────────────
+# Redis 메트릭 (redis-exporter)
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: redis-exporter
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  namespaceSelector:
+    matchNames:
+      - gymplan-infra
+  selector:
+    matchLabels:
+      app: redis-exporter
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+# ─────────────────────────────────────────────
+# MySQL 메트릭 (mysqld-exporter)
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mysql-exporter
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  namespaceSelector:
+    matchNames:
+      - gymplan-infra
+  selector:
+    matchLabels:
+      app: mysql-exporter
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+# ─────────────────────────────────────────────
+# MongoDB 메트릭 (mongodb-exporter)
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongodb-exporter
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  namespaceSelector:
+    matchNames:
+      - gymplan-infra
+  selector:
+    matchLabels:
+      app: mongodb-exporter
+  endpoints:
+    - port: metrics
+      interval: 30s
+---
+# ─────────────────────────────────────────────
+# Elasticsearch 메트릭 (elasticsearch-exporter)
+# ─────────────────────────────────────────────
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: elasticsearch-exporter
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  namespaceSelector:
+    matchNames:
+      - gymplan-infra
+  selector:
+    matchLabels:
+      app: elasticsearch-exporter
+  endpoints:
+    - port: metrics
+      interval: 30s

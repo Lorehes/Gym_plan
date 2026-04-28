@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: exercise-catalog
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: catalog
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: gymplan
+
+  source:
+    repoURL: https://github.com/Lorehes/Gym_plan.git
+    targetRevision: main
+    path: infra/helm/gymplan-service
+    helm:
+      valueFiles:
+        - ../../helm/values/default.yaml
+        - ../../helm/values/exercise-catalog.yaml
+        - ../../helm/values/prod/exercise-catalog.yaml
+      parameters:
+        - name: fullnameOverride
+          value: exercise-catalog
+        - name: service.port
+          value: "8083"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gymplan-prod
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 120s
+
+  revisionHistoryLimit: 10
+
+  ignoreDifferences:
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /status
+        - /spec/currentReplicas

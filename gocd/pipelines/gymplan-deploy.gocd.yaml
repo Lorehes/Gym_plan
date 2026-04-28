@@ -1,0 +1,212 @@
+format_version: 10
+
+# ═══════════════════════════════════════════════════════════════
+# GymPlan — GoCD 배포 파이프라인
+#
+# 실행 흐름:
+#   Harness CI (빌드·단위테스트·이미지 push)
+#     → [자동] Stage 1: deploy-stage   — gymplan-stage 네임스페이스 배포
+#     → [자동] Stage 2: e2e-tests      — 전체 E2E 시나리오 실행
+#     → [수동] Stage 3: approval-gate  — 프로덕션 배포 수동 승인
+#     → [자동] Stage 4: deploy-prod    — ArgoCD로 gymplan-prod 배포
+#
+# 전제:
+#   - GoCD YAML Config Plugin (format_version 10)
+#   - GoCD Agent에 kubectl, argocd CLI, gradle(JDK 17) 설치
+#   - Secret: ARGOCD_AUTH_TOKEN, KUBECONFIG → Vault Agent Injector 주입
+#   - IMAGE_TAG: Harness CI가 GCS artifact로 전달 (commit SHA 8자리)
+# ═══════════════════════════════════════════════════════════════
+
+pipelines:
+
+  # ─────────────────────────────────────────────────────────────
+  # [upstream] Harness CI 완료 신호를 받는 트리거 파이프라인
+  # Harness가 빌드 후 image_tag.txt를 GCS artifact로 업로드
+  # ─────────────────────────────────────────────────────────────
+  gymplan-ci-trigger:
+    group: gymplan
+    display_order: 1
+    lock_behavior: lockOnFailure
+    materials:
+      git:
+        git: https://github.com/Lorehes/Gym_plan.git
+        branch: develop
+        shallow_clone: true
+        destination: gymplan
+    environment_variables:
+      IMAGE_REGISTRY: ghcr.io/lorehes
+      KUBE_CONTEXT_STAGE: gymplan-stage
+      KUBE_CONTEXT_PROD: gymplan-prod
+    stages:
+      # GoCD trigger용 no-op stage — 실제 작업은 gymplan-deploy가 upstream으로 실행
+      - fetch-artifacts:
+          clean_workspace: true
+          jobs:
+            fetch:
+              timeout: 5
+              tasks:
+                - exec:
+                    command: /bin/sh
+                    arguments:
+                      - -c
+                      - |
+                        # Harness CI가 업로드한 image_tag.txt 를 GCS에서 가져옴
+                        # 예: gsutil cp gs://gymplan-ci-cache/artifacts/image_tag.txt .
+                        echo "Fetching image tag from CI artifact store..."
+                        gsutil cp gs://gymplan-ci-artifacts/${GO_PIPELINE_LABEL}/image_tag.txt ./image_tag.txt
+                        export IMAGE_TAG=$(cat image_tag.txt)
+                        echo "IMAGE_TAG=${IMAGE_TAG}" > env.properties
+                        cat env.properties
+              artifacts:
+                - build:
+                    source: env.properties
+                    destination: ci-artifacts
+
+  # ─────────────────────────────────────────────────────────────
+  # 메인 배포 파이프라인
+  # ─────────────────────────────────────────────────────────────
+  gymplan-deploy:
+    group: gymplan
+    display_order: 2
+    lock_behavior: lockOnFailure
+
+    materials:
+      upstream:
+        pipeline: gymplan-ci-trigger
+        stage: fetch-artifacts
+
+    environment_variables:
+      IMAGE_REGISTRY: ghcr.io/lorehes
+      ARGOCD_SERVER: argocd.gymplan.internal
+      STAGE_NAMESPACE: gymplan-stage
+      PROD_NAMESPACE: gymplan-prod
+      STAGE_GATEWAY_URL: https://stage.gymplan.internal
+      # ARGOCD_AUTH_TOKEN, KUBECONFIG 는 Vault Agent Injector 로 주입
+
+    # ──────────────────────────────────────────────────────────
+    # Stage 1: deploy-stage
+    # · image_tag.txt 에서 IMAGE_TAG 읽기
+    # · infra/k8s/overlays/stage/ 의 이미지 태그 업데이트 (kustomize)
+    # · ArgoCD Sync → gymplan-stage 네임스페이스
+    # · 롤아웃 완료 대기 (7개 서비스)
+    # ──────────────────────────────────────────────────────────
+    stages:
+      - deploy-stage:
+          clean_workspace: true
+          approval:
+            type: success  # upstream stage 성공 시 자동 실행
+          jobs:
+            deploy:
+              timeout: 20
+              tasks:
+                - fetch:
+                    pipeline: gymplan-ci-trigger
+                    stage: fetch-artifacts
+                    job: fetch
+                    source: ci-artifacts
+                    destination: .
+
+                - exec:
+                    command: /bin/sh
+                    arguments:
+                      - -c
+                      - gocd/scripts/deploy-stage.sh
+              artifacts:
+                - build:
+                    source: deploy-stage-result.txt
+                    destination: stage-artifacts
+
+      # ──────────────────────────────────────────────────────────
+      # Stage 2: e2e-tests
+      # · e2e 모듈: ScenarioATest (루틴 흐름), ScenarioBTest (검색)
+      # · Stage 환경 URL 을 주입하여 실제 배포된 서비스 대상으로 실행
+      # · JUnit XML 결과 수집
+      # ──────────────────────────────────────────────────────────
+      - e2e-tests:
+          clean_workspace: false  # deploy-stage 아티팩트 재사용
+          approval:
+            type: success
+          jobs:
+            run-e2e:
+              timeout: 30
+              tasks:
+                - fetch:
+                    pipeline: gymplan-ci-trigger
+                    stage: fetch-artifacts
+                    job: fetch
+                    source: ci-artifacts
+                    destination: .
+
+                - exec:
+                    command: /bin/sh
+                    arguments:
+                      - -c
+                      - gocd/scripts/run-e2e.sh
+              artifacts:
+                - test:
+                    source: e2e/build/test-results/test/*.xml
+                    destination: e2e-results
+                - build:
+                    source: e2e/build/reports/tests/test
+                    destination: e2e-report
+
+      # ──────────────────────────────────────────────────────────
+      # Stage 3: approval-gate
+      # · 수동 승인 필요 (GoCD UI 또는 GoCD API 호출)
+      # · 승인자: 지정된 GoCD role (deploy-approver) 만 가능
+      # · e2e-tests 통과 후에만 승인 버튼 활성화
+      # ──────────────────────────────────────────────────────────
+      - approval-gate:
+          approval:
+            type: manual
+            allow_only_on_success: true
+            roles:
+              - deploy-approver
+          jobs:
+            confirm:
+              timeout: 5
+              tasks:
+                - exec:
+                    command: /bin/sh
+                    arguments:
+                      - -c
+                      - |
+                        export IMAGE_TAG=$(grep IMAGE_TAG ci-artifacts/env.properties | cut -d= -f2)
+                        echo "======================================="
+                        echo "프로덕션 배포 승인됨"
+                        echo "IMAGE_TAG : ${IMAGE_TAG}"
+                        echo "대상 네임스페이스: ${PROD_NAMESPACE}"
+                        echo "승인자  : ${GO_TRIGGER_USER}"
+                        echo "파이프라인 : ${GO_PIPELINE_NAME}/${GO_PIPELINE_COUNTER}"
+                        echo "======================================="
+
+      # ──────────────────────────────────────────────────────────
+      # Stage 4: deploy-prod
+      # · Stage 이미지 태그를 그대로 prod overlays 에 반영 (Promote)
+      # · ArgoCD Sync → gymplan-prod 네임스페이스
+      # · 롤아웃 완료 대기 후 스모크 테스트
+      # ──────────────────────────────────────────────────────────
+      - deploy-prod:
+          clean_workspace: false
+          approval:
+            type: success
+          jobs:
+            deploy:
+              timeout: 30
+              tasks:
+                - fetch:
+                    pipeline: gymplan-ci-trigger
+                    stage: fetch-artifacts
+                    job: fetch
+                    source: ci-artifacts
+                    destination: .
+
+                - exec:
+                    command: /bin/sh
+                    arguments:
+                      - -c
+                      - gocd/scripts/deploy-prod.sh
+              artifacts:
+                - build:
+                    source: deploy-prod-result.txt
+                    destination: prod-artifacts

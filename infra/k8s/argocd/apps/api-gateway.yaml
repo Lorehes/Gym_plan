@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: api-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: gateway
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"   # 서비스보다 먼저 배포
+spec:
+  project: gymplan
+
+  source:
+    repoURL: https://github.com/Lorehes/Gym_plan.git
+    targetRevision: main
+    path: infra/helm/gymplan-service
+    helm:
+      # 우선순위: default.yaml → api-gateway.yaml → prod/api-gateway.yaml
+      valueFiles:
+        - ../../helm/values/default.yaml
+        - ../../helm/values/api-gateway.yaml
+        - ../../helm/values/prod/api-gateway.yaml
+      parameters:
+        - name: fullnameOverride
+          value: api-gateway
+        - name: service.port
+          value: "8080"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gymplan-prod
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false   # GoCD 승인 후 배포이므로 self-heal 비활성화
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 120s
+
+  revisionHistoryLimit: 10
+
+  ignoreDifferences:
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /status
+        - /spec/currentReplicas

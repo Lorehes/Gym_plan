@@ -1,0 +1,320 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gymplan-alerts
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  groups:
+
+    # ─────────────────────────────────────────────
+    # HTTP 응답 시간 (SLA: P95 < 500ms)
+    # ─────────────────────────────────────────────
+    - name: gymplan.http.latency
+      interval: 30s
+      rules:
+        - alert: HighP95Latency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (service, le) (
+                rate(http_server_requests_seconds_bucket{
+                  namespace="gymplan-prod",
+                  status!~"5.."
+                }[5m])
+              )
+            ) > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "P95 응답 시간 초과 — {{ $labels.service }}"
+            description: "{{ $labels.service }} P95 응답 시간이 {{ $value | humanizeDuration }} (기준: 500ms)"
+
+        # 오늘의 루틴 조회는 200ms 기준 (plan-service)
+        - alert: PlanServiceHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (service, le) (
+                rate(http_server_requests_seconds_bucket{
+                  namespace="gymplan-prod",
+                  service="plan-service"
+                }[5m])
+              )
+            ) > 0.2
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "plan-service P95 응답 > 200ms"
+            description: "오늘의 루틴 조회 P95 {{ $value | humanizeDuration }} (Redis 캐시 히트 기준 200ms)"
+
+    # ─────────────────────────────────────────────
+    # HTTP 에러율 (기준: > 1%)
+    # ─────────────────────────────────────────────
+    - name: gymplan.http.errors
+      interval: 30s
+      rules:
+        - alert: HighErrorRate
+          expr: |
+            (
+              sum by (service) (
+                rate(http_server_requests_seconds_count{
+                  namespace="gymplan-prod",
+                  status=~"5.."
+                }[1m])
+              )
+            ) /
+            (
+              sum by (service) (
+                rate(http_server_requests_seconds_count{
+                  namespace="gymplan-prod"
+                }[1m])
+              )
+            ) > 0.01
+          for: 1m
+          labels:
+            severity: critical
+            team: backend
+          annotations:
+            summary: "에러율 > 1% — {{ $labels.service }}"
+            description: "{{ $labels.service }} 에러율 {{ $value | humanizePercentage }}"
+
+    # ─────────────────────────────────────────────
+    # Pod 재시작 (기준: 10분 내 > 3회)
+    # ─────────────────────────────────────────────
+    - name: gymplan.pod.restart
+      interval: 30s
+      rules:
+        - alert: PodRestartTooOften
+          expr: |
+            increase(kube_pod_container_status_restarts_total{
+              namespace="gymplan-prod"
+            }[10m]) > 3
+          for: 0m
+          labels:
+            severity: critical
+            team: infra
+          annotations:
+            summary: "Pod 재시작 반복 — {{ $labels.pod }}"
+            description: "{{ $labels.namespace }}/{{ $labels.pod }} 10분 내 {{ $value }}회 재시작"
+
+    # ─────────────────────────────────────────────
+    # JVM 메트릭
+    # ─────────────────────────────────────────────
+    - name: gymplan.jvm
+      interval: 30s
+      rules:
+        - alert: JvmHeapUsageHigh
+          expr: |
+            (
+              jvm_memory_used_bytes{area="heap", namespace="gymplan-prod"}
+              /
+              jvm_memory_max_bytes{area="heap", namespace="gymplan-prod"}
+            ) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "JVM Heap 85% 초과 — {{ $labels.service }}"
+            description: "{{ $labels.service }} Heap 사용률 {{ $value | humanizePercentage }}"
+
+        - alert: JvmGcPauseHigh
+          expr: |
+            rate(jvm_gc_pause_seconds_sum{namespace="gymplan-prod"}[5m])
+            /
+            rate(jvm_gc_pause_seconds_count{namespace="gymplan-prod"}[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "JVM GC 평균 정지 시간 > 100ms — {{ $labels.service }}"
+            description: "{{ $labels.service }} GC 평균 정지 {{ $value | humanizeDuration }}"
+
+        - alert: JvmThreadsHigh
+          expr: |
+            jvm_threads_live_threads{namespace="gymplan-prod"} > 300
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "JVM 스레드 수 과다 — {{ $labels.service }}"
+            description: "{{ $labels.service }} 활성 스레드 {{ $value }}개"
+
+    # ─────────────────────────────────────────────
+    # DB 커넥션 풀 (HikariCP)
+    # ─────────────────────────────────────────────
+    - name: gymplan.db.connections
+      interval: 30s
+      rules:
+        - alert: HikariConnectionPoolExhausted
+          expr: |
+            (
+              hikaricp_connections_active{namespace="gymplan-prod"}
+              /
+              hikaricp_connections_max{namespace="gymplan-prod"}
+            ) > 0.9
+          for: 2m
+          labels:
+            severity: critical
+            team: backend
+          annotations:
+            summary: "HikariCP 커넥션 풀 90% 초과 — {{ $labels.service }}"
+            description: "{{ $labels.service }} 커넥션 사용률 {{ $value | humanizePercentage }}"
+
+        - alert: HikariConnectionTimeout
+          expr: |
+            rate(hikaricp_connections_timeout_total{namespace="gymplan-prod"}[5m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "HikariCP 커넥션 타임아웃 발생 — {{ $labels.service }}"
+            description: "{{ $labels.service }} 5분간 타임아웃 {{ $value }}회/s"
+
+    # ─────────────────────────────────────────────
+    # Kafka Consumer Lag (기준: > 1000)
+    # ─────────────────────────────────────────────
+    - name: gymplan.kafka
+      interval: 30s
+      rules:
+        - alert: KafkaConsumerLagHigh
+          expr: |
+            kafka_consumer_group_lag{namespace="gymplan-infra"} > 1000
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "Kafka Consumer Lag > 1000 — {{ $labels.consumergroup }}"
+            description: "토픽 {{ $labels.topic }}/파티션 {{ $labels.partition }} Lag {{ $value }}"
+
+        - alert: KafkaConsumerLagCritical
+          expr: |
+            kafka_consumer_group_lag{namespace="gymplan-infra"} > 5000
+          for: 2m
+          labels:
+            severity: critical
+            team: backend
+          annotations:
+            summary: "Kafka Consumer Lag 위험 수준 — {{ $labels.consumergroup }}"
+            description: "토픽 {{ $labels.topic }} Lag {{ $value }} (즉시 확인 필요)"
+
+        - alert: KafkaBrokerDown
+          expr: |
+            kafka_brokers{namespace="gymplan-infra"} < 3
+          for: 1m
+          labels:
+            severity: critical
+            team: infra
+          annotations:
+            summary: "Kafka 브로커 수 감소"
+            description: "현재 브로커 수: {{ $value }} (기대: 3)"
+
+    # ─────────────────────────────────────────────
+    # Redis 메모리 (기준: > 80%)
+    # ─────────────────────────────────────────────
+    - name: gymplan.redis
+      interval: 30s
+      rules:
+        - alert: RedisMemoryHigh
+          expr: |
+            (
+              redis_memory_used_bytes{namespace="gymplan-infra"}
+              /
+              redis_memory_max_bytes{namespace="gymplan-infra"}
+            ) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+            team: infra
+          annotations:
+            summary: "Redis 메모리 > 80%"
+            description: "Redis 메모리 사용률 {{ $value | humanizePercentage }}"
+
+        - alert: RedisConnectionsHigh
+          expr: |
+            redis_connected_clients{namespace="gymplan-infra"} > 500
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "Redis 연결 수 과다"
+            description: "현재 연결 수: {{ $value }}"
+
+        - alert: RedisKeyEvictionHigh
+          expr: |
+            rate(redis_evicted_keys_total{namespace="gymplan-infra"}[5m]) > 10
+          for: 3m
+          labels:
+            severity: warning
+            team: infra
+          annotations:
+            summary: "Redis 키 강제 삭제 빈번"
+            description: "5분간 평균 eviction {{ $value }}회/s (메모리 부족 징후)"
+
+    # ─────────────────────────────────────────────
+    # MongoDB (workout-service 전용)
+    # ─────────────────────────────────────────────
+    - name: gymplan.mongodb
+      interval: 30s
+      rules:
+        - alert: MongoDBConnectionsHigh
+          expr: |
+            mongodb_connections{state="current", namespace="gymplan-infra"} > 400
+          for: 5m
+          labels:
+            severity: warning
+            team: infra
+          annotations:
+            summary: "MongoDB 연결 수 과다"
+            description: "현재 연결 수: {{ $value }}"
+
+        - alert: MongoDBReplicationLag
+          expr: |
+            mongodb_replset_member_replication_lag{namespace="gymplan-infra"} > 10
+          for: 2m
+          labels:
+            severity: warning
+            team: infra
+          annotations:
+            summary: "MongoDB Replica 동기화 지연 > 10초"
+            description: "멤버 {{ $labels.member }} 지연 {{ $value }}초"
+
+    # ─────────────────────────────────────────────
+    # Elasticsearch (exercise-catalog, analytics-service)
+    # ─────────────────────────────────────────────
+    - name: gymplan.elasticsearch
+      interval: 30s
+      rules:
+        - alert: ElasticsearchClusterNotGreen
+          expr: |
+            elasticsearch_cluster_health_status{color="green", namespace="gymplan-infra"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            team: infra
+          annotations:
+            summary: "Elasticsearch 클러스터 상태 이상"
+            description: "클러스터가 Green 상태가 아님 (즉시 확인 필요)"
+
+        - alert: ElasticsearchSearchLatencyHigh
+          # P95 검색 > 500ms (SLA 기준)
+          expr: |
+            elasticsearch_indices_search_fetch_time_seconds{namespace="gymplan-infra"}
+            /
+            elasticsearch_indices_search_fetch_total{namespace="gymplan-infra"} > 0.5
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "Elasticsearch 검색 평균 응답 > 500ms"
+            description: "현재 평균 응답 {{ $value | humanizeDuration }}"

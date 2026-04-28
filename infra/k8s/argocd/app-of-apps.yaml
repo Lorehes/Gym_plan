@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gymplan-apps
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"   # 서비스 앱보다 먼저 동기화
+spec:
+  project: gymplan
+
+  # ── infra/k8s/argocd/apps/ 아래 모든 Application CRD를 관리 ──
+  source:
+    repoURL: https://github.com/Lorehes/Gym_plan.git
+    targetRevision: main
+    path: infra/k8s/argocd/apps
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true       # apps/ 에서 파일 삭제 시 Application CRD도 삭제
+      selfHeal: true    # App of Apps 자체는 항상 self-heal
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+
+  # App of Apps는 롤백 이력 풍부하게 보관
+  revisionHistoryLimit: 20

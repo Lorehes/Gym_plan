@@ -1,0 +1,548 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-infra
+  namespace: monitoring
+data:
+  infra-dashboard.json: |
+    {
+      "uid": "gymplan-infra",
+      "title": "GymPlan — 인프라 대시보드",
+      "description": "CPU/Memory, Pod 상태, Kafka Consumer Lag, Redis 메모리",
+      "tags": ["gymplan", "infra"],
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "timezone": "Asia/Seoul",
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kube_pod_info, namespace)",
+            "regex": "gymplan.*",
+            "multi": false,
+            "includeAll": false,
+            "current": { "text": "gymplan-prod", "value": "gymplan-prod" }
+          },
+          {
+            "name": "pod",
+            "type": "query",
+            "datasource": { "uid": "thanos" },
+            "query": "label_values(kube_pod_info{namespace=\"$namespace\"}, pod)",
+            "multi": true,
+            "includeAll": true
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Pod 상태 요약",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+        },
+        {
+          "id": 2,
+          "title": "Running Pods",
+          "type": "stat",
+          "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0, "color": "red" },
+                  { "value": 6, "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            {
+              "expr": "count(kube_pod_status_phase{namespace=\"gymplan-prod\",phase=\"Running\"})",
+              "legendFormat": "Running"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Pending / Failed Pods",
+          "type": "stat",
+          "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0, "color": "green" },
+                  { "value": 1, "color": "red" }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            {
+              "expr": "count(kube_pod_status_phase{namespace=\"gymplan-prod\",phase=~\"Pending|Failed\"}) or vector(0)",
+              "legendFormat": "비정상"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Pod 재시작 수 (10분)",
+          "type": "stat",
+          "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0, "color": "green" },
+                  { "value": 1, "color": "yellow" },
+                  { "value": 3, "color": "red" }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"gymplan-prod\"}[10m]))",
+              "legendFormat": "재시작"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Kafka Consumer Lag 합계",
+          "type": "stat",
+          "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,    "color": "green" },
+                  { "value": 500,  "color": "yellow" },
+                  { "value": 1000, "color": "red" }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            {
+              "expr": "sum(kafka_consumer_group_lag{namespace=\"gymplan-infra\"})",
+              "legendFormat": "전체 Lag"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Redis 메모리 사용률",
+          "type": "gauge",
+          "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,   "color": "green" },
+                  { "value": 0.7, "color": "yellow" },
+                  { "value": 0.8, "color": "red" }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            {
+              "expr": "redis_memory_used_bytes{namespace=\"gymplan-infra\"} / redis_memory_max_bytes{namespace=\"gymplan-infra\"}",
+              "legendFormat": "사용률"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Pod 상태 테이블",
+          "type": "table",
+          "gridPos": { "x": 0, "y": 5, "w": 24, "h": 7 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": { "unit": "short" },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "재시작 수" },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "value": 0, "color": "green" },
+                        { "value": 3, "color": "red" }
+                      ]
+                    }
+                  },
+                  { "id": "custom.displayMode", "value": "color-background" }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "sortBy": [{ "displayName": "재시작 수", "desc": true }]
+          },
+          "transformations": [
+            { "id": "merge", "options": {} },
+            {
+              "id": "organize",
+              "options": {
+                "renameByName": {
+                  "pod": "Pod",
+                  "container": "컨테이너",
+                  "namespace": "네임스페이스",
+                  "Value #A": "재시작 수",
+                  "Value #B": "CPU (cores)",
+                  "Value #C": "Memory (MB)"
+                }
+              }
+            }
+          ],
+          "targets": [
+            {
+              "expr": "sum by (pod, container, namespace) (kube_pod_container_status_restarts_total{namespace=~\"gymplan.*\"})",
+              "legendFormat": "",
+              "instant": true,
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (pod, container, namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"gymplan.*\"}[5m]))",
+              "legendFormat": "",
+              "instant": true,
+              "refId": "B"
+            },
+            {
+              "expr": "sum by (pod, container, namespace) (container_memory_working_set_bytes{namespace=~\"gymplan.*\"}) / 1024 / 1024",
+              "legendFormat": "",
+              "instant": true,
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "CPU",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 12, "w": 24, "h": 1 }
+        },
+        {
+          "id": 21,
+          "title": "서비스별 CPU 사용량",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "cores",
+              "custom": { "lineWidth": 2 }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"}[5m]))",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "title": "서비스별 CPU 사용률 (Request 대비)",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": { "lineWidth": 2 },
+              "max": 1
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"}[5m])) / sum by (pod) (kube_pod_container_resource_requests{namespace=\"$namespace\",pod=~\"$pod\",resource=\"cpu\"})",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        },
+        {
+          "id": 30,
+          "title": "메모리",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 21, "w": 24, "h": 1 }
+        },
+        {
+          "id": 31,
+          "title": "서비스별 메모리 사용량",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "lineWidth": 2 }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\",pod=~\"$pod\",container!=\"\",container!=\"POD\"})",
+              "legendFormat": "{{ pod }}"
+            }
+          ]
+        },
+        {
+          "id": 32,
+          "title": "JVM Heap 사용률",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": { "lineWidth": 2 },
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,    "color": "green" },
+                  { "value": 0.75, "color": "yellow" },
+                  { "value": 0.85, "color": "red" }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "임계값 (85%)" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [8, 4], "fill": "dash" } },
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+                  { "id": "custom.lineWidth", "value": 1 }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "sum by (service) (jvm_memory_used_bytes{area=\"heap\",namespace=\"gymplan-prod\"}) / sum by (service) (jvm_memory_max_bytes{area=\"heap\",namespace=\"gymplan-prod\"})",
+              "legendFormat": "{{ service }}"
+            },
+            {
+              "expr": "0.85",
+              "legendFormat": "임계값 (85%)"
+            }
+          ]
+        },
+        {
+          "id": 40,
+          "title": "Kafka",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 }
+        },
+        {
+          "id": 41,
+          "title": "Kafka Consumer Lag (토픽별)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 31, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,    "color": "green" },
+                  { "value": 500,  "color": "yellow" },
+                  { "value": 1000, "color": "red" }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "임계값 (1000)" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [8, 4], "fill": "dash" } },
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+                  { "id": "custom.lineWidth", "value": 1 }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max", "lastNotNull"] }
+          },
+          "targets": [
+            {
+              "expr": "sum by (topic, consumergroup) (kafka_consumer_group_lag{namespace=\"gymplan-infra\"})",
+              "legendFormat": "{{ consumergroup }} / {{ topic }}"
+            },
+            {
+              "expr": "1000",
+              "legendFormat": "임계값 (1000)"
+            }
+          ]
+        },
+        {
+          "id": 42,
+          "title": "Kafka 메시지 처리율 (토픽별)",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 31, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2 }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_messagesin_total{namespace=\"gymplan-infra\"}[5m]))",
+              "legendFormat": "{{ topic }} (in)"
+            },
+            {
+              "expr": "sum by (topic) (rate(kafka_server_brokertopicmetrics_bytesout_total{namespace=\"gymplan-infra\"}[5m]))",
+              "legendFormat": "{{ topic }} (out bytes)"
+            }
+          ]
+        },
+        {
+          "id": 50,
+          "title": "Redis",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 39, "w": 24, "h": 1 }
+        },
+        {
+          "id": 51,
+          "title": "Redis 메모리 사용량 추이",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "lineWidth": 2 }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "최대 (maxmemory)" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [8, 4], "fill": "dash" } },
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "임계값 (80%)" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [8, 4], "fill": "dash" } },
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+                  { "id": "custom.lineWidth", "value": 1 }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "redis_memory_used_bytes{namespace=\"gymplan-infra\"}",
+              "legendFormat": "사용량"
+            },
+            {
+              "expr": "redis_memory_max_bytes{namespace=\"gymplan-infra\"}",
+              "legendFormat": "최대 (maxmemory)"
+            },
+            {
+              "expr": "redis_memory_max_bytes{namespace=\"gymplan-infra\"} * 0.8",
+              "legendFormat": "임계값 (80%)"
+            }
+          ]
+        },
+        {
+          "id": 52,
+          "title": "Redis 커맨드 처리율 / 히트율",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2 }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "키스페이스 히트율" },
+                "properties": [
+                  { "id": "unit", "value": "percentunit" },
+                  { "id": "custom.axisPlacement", "value": "right" }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "rate(redis_commands_processed_total{namespace=\"gymplan-infra\"}[1m])",
+              "legendFormat": "커맨드/s"
+            },
+            {
+              "expr": "rate(redis_keyspace_hits_total{namespace=\"gymplan-infra\"}[5m]) / (rate(redis_keyspace_hits_total{namespace=\"gymplan-infra\"}[5m]) + rate(redis_keyspace_misses_total{namespace=\"gymplan-infra\"}[5m]))",
+              "legendFormat": "키스페이스 히트율"
+            }
+          ]
+        }
+      ]
+    }

@@ -1,0 +1,272 @@
+# =============================================================================
+# DestinationRules — 서비스별 mTLS + 트래픽 정책
+#
+# 공통 정책:
+#   trafficPolicy.tls.mode: ISTIO_MUTUAL
+#     → 이 서비스를 호출하는 모든 클라이언트(사이드카)에게
+#       Istio가 자동 발급한 mTLS 인증서를 사용하도록 강제한다.
+#     → PeerAuthentication STRICT와 함께 양방향 검증을 완성한다.
+#
+#   outlierDetection (서킷 브레이커):
+#     → 연속 5xx 오류가 발생한 호스트를 일시적으로 제외(eject)한다.
+#     → Pod 재시작/배포 중 발생하는 일시적 오류로부터 서비스를 보호한다.
+#
+#   connectionPool:
+#     → HikariCP maximumPoolSize(20)와 균형을 맞춰 설정.
+#     → HTTP/2 업그레이드(h2UpgradePolicy: UPGRADE)로 멀티플렉싱 활성화.
+#
+# subset v1:
+#   현재는 단일 버전만 운영. 향후 카나리 배포 시 v2 subset 추가.
+#   VirtualService의 weight 기반 트래픽 분할과 함께 사용.
+#
+# 네임스페이스:
+#   모든 서비스가 gymplan-prod에 존재하므로 short host name 사용 가능.
+#   다른 네임스페이스에서 호출 시 FQDN 사용:
+#     user-service.gymplan-prod.svc.cluster.local
+# =============================================================================
+
+# ── api-gateway ──────────────────────────────────────────────────────────────
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: api-gateway
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: api-gateway
+spec:
+  host: api-gateway
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 200        # Ingress Gateway → api-gateway 동시 연결 상한
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 2000     # 외부 트래픽이 집중되는 진입점이므로 높게 설정
+        http1MaxPendingRequests: 500
+        h2UpgradePolicy: UPGRADE
+    # api-gateway는 단일 진입점이므로 서킷 브레이커 임계값을 다른 서비스보다 높게 설정
+    outlierDetection:
+      consecutive5xxErrors: 10
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+---
+# ── user-service ─────────────────────────────────────────────────────────────
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: user-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: user-service
+spec:
+  host: user-service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 500
+        http1MaxPendingRequests: 100
+        h2UpgradePolicy: UPGRADE
+    # 로그인/회원가입 실패는 서비스 오류가 아니라 클라이언트 오류(4xx)이므로
+    # 5xx 연속 발생이 실제 서비스 장애를 의미함
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+---
+# ── plan-service ─────────────────────────────────────────────────────────────
+# 성능 목표: P95 < 200ms (오늘의 루틴 조회, Redis 캐시 히트 기준)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: plan-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: plan-service
+spec:
+  host: plan-service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 1000
+        http1MaxPendingRequests: 200
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+---
+# ── exercise-catalog ─────────────────────────────────────────────────────────
+# Elasticsearch 검색 포함: P95 < 500ms
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: exercise-catalog
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: exercise-catalog
+spec:
+  host: exercise-catalog
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 500
+        http1MaxPendingRequests: 100
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+---
+# ── workout-service ──────────────────────────────────────────────────────────
+# 세트 기록 API: P95 < 300ms
+# MongoDB + Kafka 발행 포함 (Kafka는 비동기, 응답 시간에 미포함)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: workout-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: workout-service
+spec:
+  host: workout-service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 1000
+        http1MaxPendingRequests: 200
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+---
+# ── analytics-service ────────────────────────────────────────────────────────
+# Kafka Consumer + Elasticsearch Aggregation
+# 통계 쿼리는 처리 시간이 길 수 있으므로 connectionPool을 보수적으로 설정
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: analytics-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: analytics-service
+spec:
+  host: analytics-service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 200
+        http1MaxPendingRequests: 50
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 60s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+
+---
+# ── notification-service ─────────────────────────────────────────────────────
+# Redis pub-sub 기반 휴식 타이머, FCM 푸시 알림
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: notification-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: notification-service
+spec:
+  host: notification-service
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+        connectTimeout: 3s
+      http:
+        http2MaxRequests: 200
+        http1MaxPendingRequests: 50
+        h2UpgradePolicy: UPGRADE
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50
+  subsets:
+    - name: v1
+      labels:
+        version: v1

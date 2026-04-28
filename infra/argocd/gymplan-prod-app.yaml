@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gymplan-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: gymplan
+  source:
+    repoURL: https://github.com/Lorehes/Gym_plan.git
+    targetRevision: main
+    path: infra/k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gymplan-prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false   # 수동 승인 후 GoCD가 트리거하므로 자동 self-heal 비활성화
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 180s
+  revisionHistoryLimit: 10
+  ignoreDifferences:
+    # HPA currentReplicas는 ArgoCD가 diff로 잡지 않도록 무시
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /status

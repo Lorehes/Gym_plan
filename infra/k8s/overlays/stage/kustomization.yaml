@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gymplan-stage
+
+# Stage는 prod base를 그대로 참조하되 네임스페이스와 이미지 태그만 덮어씀
+resources:
+  - ../../hpa
+  - ../../monitoring
+
+# GoCD deploy-stage.sh 가 아래 images 블록을 kustomize edit set image 로 갱신
+images:
+  - name: ghcr.io/lorehes/api-gateway
+    newTag: latest
+  - name: ghcr.io/lorehes/user-service
+    newTag: latest
+  - name: ghcr.io/lorehes/plan-service
+    newTag: latest
+  - name: ghcr.io/lorehes/exercise-catalog
+    newTag: latest
+  - name: ghcr.io/lorehes/workout-service
+    newTag: latest
+  - name: ghcr.io/lorehes/analytics-service
+    newTag: latest
+  - name: ghcr.io/lorehes/notification-service
+    newTag: latest
+
+commonLabels:
+  env: stage
+
+patches:
+  # Stage는 replica 1개 고정 (비용 절감)
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+    target:
+      kind: HorizontalPodAutoscaler

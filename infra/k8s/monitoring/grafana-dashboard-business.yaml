@@ -1,0 +1,354 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-business
+  namespace: monitoring
+# 비즈니스 메트릭은 Spring Boot Actuator에서 Counter/Gauge로 노출
+# 서비스 구현 시 아래 메트릭명을 그대로 사용해야 대시보드와 연동됨:
+#   gymplan_active_users_daily          (user-service: 일간 로그인 사용자)
+#   gymplan_workout_sessions_total      (workout-service: 세션 시작 카운터)
+#   gymplan_workout_sessions_completed  (workout-service: 세션 완료 카운터)
+#   gymplan_user_registrations_total    (user-service: 신규 가입 카운터)
+#   gymplan_sets_logged_total           (workout-service: 세트 기록 카운터)
+data:
+  business-dashboard.json: |
+    {
+      "uid": "gymplan-business",
+      "title": "GymPlan — 비즈니스 메트릭",
+      "description": "DAU, 운동 완료율, 신규 가입 등 핵심 비즈니스 지표",
+      "tags": ["gymplan", "business"],
+      "refresh": "5m",
+      "time": { "from": "now-7d", "to": "now" },
+      "timezone": "Asia/Seoul",
+      "templating": { "list": [] },
+      "panels": [
+        {
+          "id": 1,
+          "title": "사용자 현황",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+        },
+        {
+          "id": 2,
+          "title": "DAU (오늘)",
+          "type": "stat",
+          "gridPos": { "x": 0, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,    "color": "blue" },
+                  { "value": 100,  "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "sparkline": { "show": true }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_active_users_daily{namespace=\"gymplan-prod\"}[24h]))",
+              "legendFormat": "DAU"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "신규 가입 (오늘)",
+          "type": "stat",
+          "gridPos": { "x": 4, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,   "color": "blue" },
+                  { "value": 10,  "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "sparkline": { "show": true }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_user_registrations_total{namespace=\"gymplan-prod\"}[24h]))",
+              "legendFormat": "신규 가입"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "운동 완료율 (오늘)",
+          "type": "gauge",
+          "gridPos": { "x": 8, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,   "color": "red" },
+                  { "value": 0.5, "color": "yellow" },
+                  { "value": 0.7, "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_workout_sessions_completed{namespace=\"gymplan-prod\"}[24h])) / sum(increase(gymplan_workout_sessions_total{namespace=\"gymplan-prod\"}[24h]))",
+              "legendFormat": "완료율"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "총 세트 기록 (오늘)",
+          "type": "stat",
+          "gridPos": { "x": 12, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,    "color": "blue" },
+                  { "value": 500,  "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "sparkline": { "show": true }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_sets_logged_total{namespace=\"gymplan-prod\"}[24h]))",
+              "legendFormat": "세트 기록"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "운동 완료 세션 (오늘)",
+          "type": "stat",
+          "gridPos": { "x": 16, "y": 1, "w": 4, "h": 4 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,   "color": "blue" },
+                  { "value": 50,  "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "sparkline": { "show": true }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_workout_sessions_completed{namespace=\"gymplan-prod\"}[24h]))",
+              "legendFormat": "완료 세션"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "DAU 추이 (7일)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": { "mode": "palette-classic" }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "single" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_active_users_daily{namespace=\"gymplan-prod\"}[1d]))",
+              "legendFormat": "DAU",
+              "interval": "1d"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "신규 가입 추이 (7일)",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              },
+              "color": { "mode": "palette-classic" }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "single" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_user_registrations_total{namespace=\"gymplan-prod\"}[1d]))",
+              "legendFormat": "신규 가입",
+              "interval": "1d"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "운동 현황",
+          "type": "row",
+          "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 }
+        },
+        {
+          "id": 21,
+          "title": "운동 세션 시작 vs 완료 (7일)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_workout_sessions_total{namespace=\"gymplan-prod\"}[1d]))",
+              "legendFormat": "세션 시작",
+              "interval": "1d"
+            },
+            {
+              "expr": "sum(increase(gymplan_workout_sessions_completed{namespace=\"gymplan-prod\"}[1d]))",
+              "legendFormat": "세션 완료",
+              "interval": "1d"
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "title": "세트 기록 수 추이 (7일)",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 14, "w": 12, "h": 8 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "single" },
+            "legend": { "displayMode": "list", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(gymplan_sets_logged_total{namespace=\"gymplan-prod\"}[1d]))",
+              "legendFormat": "세트 기록",
+              "interval": "1d"
+            }
+          ]
+        },
+        {
+          "id": 30,
+          "title": "plan-service 캐시 히트율 (Redis)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 22, "w": 12, "h": 7 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "custom": { "lineWidth": 2 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "value": 0,   "color": "red" },
+                  { "value": 0.8, "color": "green" }
+                ]
+              }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(cache_gets_total{namespace=\"gymplan-prod\",service=\"plan-service\",result=\"hit\"}[5m])) / sum(rate(cache_gets_total{namespace=\"gymplan-prod\",service=\"plan-service\"}[5m]))",
+              "legendFormat": "캐시 히트율"
+            }
+          ]
+        },
+        {
+          "id": 31,
+          "title": "Kafka 이벤트 처리량",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 22, "w": 12, "h": 7 },
+          "datasource": { "uid": "thanos" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2 }
+            }
+          },
+          "options": {
+            "tooltip": { "mode": "multi" },
+            "legend": { "displayMode": "table", "placement": "bottom" }
+          },
+          "targets": [
+            {
+              "expr": "sum by (topic) (rate(kafka_consumer_records_consumed_total{namespace=\"gymplan-infra\"}[5m]))",
+              "legendFormat": "{{ topic }}"
+            }
+          ]
+        }
+      ]
+    }

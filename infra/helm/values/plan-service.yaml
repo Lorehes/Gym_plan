@@ -1,0 +1,21 @@
+image:
+  repository: ghcr.io/lorehes/gymplan/plan-service
+
+service:
+  port: 8082
+  targetPort: 8082
+
+vault:
+  role: gymplan-plan-service
+  agentEnvTemplate: |
+    {{- with secret "secret/data/gymplan/plan-service" -}}
+    export DB_PASSWORD='{{ .Data.data.db-password }}'
+    export REDIS_PASSWORD='{{ .Data.data.redis-password }}'
+    {{- end }}
+    {{- with secret "secret/data/gymplan/jwt" -}}
+    export JWT_PUBLIC_KEY='{{ .Data.data.public-key }}'
+    {{- end }}
+
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: k8s

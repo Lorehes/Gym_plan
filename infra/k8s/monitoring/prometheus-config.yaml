@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: gymplan-prometheus
+  namespace: monitoring
+spec:
+  replicas: 1
+  retention: 2h  # Thanos sidecar 이후 장기 보존은 object storage로
+  retentionSize: 10GB
+  serviceAccountName: prometheus
+  serviceMonitorNamespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values:
+          - gymplan-prod
+          - gymplan-infra
+  serviceMonitorSelector:
+    matchLabels:
+      monitoring: gymplan
+  ruleSelector:
+    matchLabels:
+      monitoring: gymplan
+  alerting:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager
+        port: web
+  thanos:
+    image: quay.io/thanos/thanos:v0.35.0
+    objectStorageConfig:
+      secret:
+        name: thanos-objstore-config
+        key: objstore.yml
+  externalLabels:
+    cluster: gymplan-prod
+    replica: "0"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - rbac.yaml
+  - prometheus-config.yaml
+  - service-monitors.yaml
+  - prometheus-rules.yaml
+  - thanos.yaml
+  - alertmanager.yaml
+  - grafana-deployment.yaml
+  - grafana-dashboard-sla.yaml
+  - grafana-dashboard-business.yaml
+  - grafana-dashboard-infra.yaml
+
+commonLabels:
+  part-of: gymplan-monitoring

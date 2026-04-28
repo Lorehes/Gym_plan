@@ -1,0 +1,112 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: alertmanager
+  namespace: monitoring
+spec:
+  replicas: 1
+  alertmanagerConfigSelector:
+    matchLabels:
+      monitoring: gymplan
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+---
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: gymplan-alertmanager-config
+  namespace: monitoring
+  labels:
+    monitoring: gymplan
+spec:
+  route:
+    groupBy: ["alertname", "service", "severity"]
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    receiver: slack-backend
+    routes:
+      - matchers:
+          - name: severity
+            value: critical
+        receiver: slack-critical
+        repeatInterval: 1h
+      - matchers:
+          - name: team
+            value: infra
+        receiver: slack-infra
+
+  receivers:
+    - name: slack-backend
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: backend-webhook-url
+          channel: "#gymplan-alerts-backend"
+          sendResolved: true
+          title: |
+            [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *서비스:* {{ .Labels.service }}
+            *요약:* {{ .Annotations.summary }}
+            *상세:* {{ .Annotations.description }}
+            {{ end }}
+
+    - name: slack-critical
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: critical-webhook-url
+          channel: "#gymplan-alerts-critical"
+          sendResolved: true
+          title: |
+            🚨 [CRITICAL] {{ .CommonLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *서비스:* {{ .Labels.service }}
+            *요약:* {{ .Annotations.summary }}
+            *상세:* {{ .Annotations.description }}
+            {{ end }}
+
+    - name: slack-infra
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-slack-secret
+            key: infra-webhook-url
+          channel: "#gymplan-alerts-infra"
+          sendResolved: true
+          title: |
+            [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}
+          text: |
+            {{ range .Alerts }}
+            *요약:* {{ .Annotations.summary }}
+            *상세:* {{ .Annotations.description }}
+            {{ end }}
+
+  inhibitRules:
+    # 같은 서비스에서 critical이 발생하면 warning 억제
+    - sourceMatchers:
+        - name: severity
+          value: critical
+      targetMatchers:
+        - name: severity
+          value: warning
+      equal: ["service"]
+---
+# Slack Webhook URL은 Vault에서 주입
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-slack-secret
+  namespace: monitoring
+  annotations:
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "monitoring"
+    vault.hashicorp.com/agent-inject-secret-slack: "secret/monitoring/slack-webhooks"
+type: Opaque

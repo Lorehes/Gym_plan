@@ -1,0 +1,49 @@
+# K8s 프로덕션 프로파일 — Vault Agent가 /vault/secrets/env.sh 에 시크릿 주입
+# SPRING_PROFILES_ACTIVE=k8s 로 활성화
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          uri: http://user-service.gymplan-prod.svc.cluster.local:8081
+          predicates:
+            - Path=/api/v1/auth/**,/api/v1/users/**
+
+        - id: plan-service
+          uri: http://plan-service.gymplan-prod.svc.cluster.local:8082
+          predicates:
+            - Path=/api/v1/plans/**,/api/v1/plans
+
+        - id: exercise-catalog
+          uri: http://exercise-catalog.gymplan-prod.svc.cluster.local:8083
+          predicates:
+            - Path=/api/v1/exercises/**,/api/v1/exercises
+
+        - id: workout-service
+          uri: http://workout-service.gymplan-prod.svc.cluster.local:8084
+          predicates:
+            - Path=/api/v1/sessions/**,/api/v1/sessions
+
+        - id: analytics-service
+          uri: http://analytics-service.gymplan-prod.svc.cluster.local:8085
+          predicates:
+            - Path=/api/v1/analytics/**
+
+        - id: notification-service
+          uri: http://notification-service.gymplan-prod.svc.cluster.local:8086
+          predicates:
+            - Path=/api/v1/notifications/**
+
+  data:
+    redis:
+      host: redis.gymplan-prod.svc.cluster.local
+      port: 6379
+      # REDIS_PASSWORD: Vault Agent가 env.sh 통해 주입
+
+# JWT_PUBLIC_KEY: Vault Agent가 env.sh 통해 주입
+
+management:
+  endpoint:
+    health:
+      show-details: never

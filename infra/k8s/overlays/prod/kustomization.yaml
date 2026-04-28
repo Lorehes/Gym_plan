@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gymplan-prod
+
+resources:
+  - ../../hpa
+  - ../../monitoring
+
+# GoCD deploy-prod.sh 가 아래 images 블록을 kustomize edit set image 로 갱신
+images:
+  - name: ghcr.io/lorehes/api-gateway
+    newTag: latest
+  - name: ghcr.io/lorehes/user-service
+    newTag: latest
+  - name: ghcr.io/lorehes/plan-service
+    newTag: latest
+  - name: ghcr.io/lorehes/exercise-catalog
+    newTag: latest
+  - name: ghcr.io/lorehes/workout-service
+    newTag: latest
+  - name: ghcr.io/lorehes/analytics-service
+    newTag: latest
+  - name: ghcr.io/lorehes/notification-service
+    newTag: latest
+
+commonLabels:
+  env: prod

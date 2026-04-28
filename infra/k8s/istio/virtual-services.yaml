@@ -1,0 +1,378 @@
+# =============================================================================
+# VirtualServices — 서비스 간 내부 라우팅, 타임아웃, 재시도 정책
+#
+# 설계 원칙:
+#   1. 타임아웃: 각 서비스의 P95 목표 × 5 (재시도 헤드룸 포함)
+#      - plan-service:     P95 < 200ms → timeout 2s
+#      - workout-service:  P95 < 300ms → timeout 3s
+#      - exercise-catalog: P95 < 500ms → timeout 5s
+#      - 나머지:           기본 5s
+#
+#   2. 재시도 정책:
+#      - retryOn: connect-failure,reset — 연결 자체가 실패한 경우만 재시도
+#        → POST/PUT 같은 쓰기 요청에도 안전하게 적용 가능
+#        → 5xx 재시도를 넣으면 멱등성 없는 쓰기 요청이 중복 처리될 수 있어 제외
+#      - attempts: 2 — 원본 1회 + 재시도 1회
+#
+#   3. GET 경로 분리 재시도 (plan-service, exercise-catalog):
+#      - 읽기 요청은 5xx에도 재시도 안전 → retryOn에 5xx 추가
+#      - VirtualService의 match.method.exact로 GET만 별도 처리
+#
+# hosts는 Kubernetes Service 이름 (short name).
+# gymplan-prod 네임스페이스 외부에서 참조 시:
+#   plan-service.gymplan-prod.svc.cluster.local
+# =============================================================================
+
+# ── api-gateway ──────────────────────────────────────────────────────────────
+# gateway.yaml의 Ingress → api-gateway 라우팅과 별개로,
+# gymplan-prod 내부 서비스가 api-gateway를 직접 호출하는 경우는 없지만
+# 헬스체크 및 사이드카 메시 내 일관성을 위해 정의한다.
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: api-gateway
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: api-gateway
+spec:
+  hosts:
+    - api-gateway
+  http:
+    - timeout: 10s
+      retries:
+        attempts: 2
+        perTryTimeout: 5s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: api-gateway
+            port:
+              number: 8080
+            subset: v1
+
+---
+# ── user-service ─────────────────────────────────────────────────────────────
+# 회원가입, 로그인, JWT 발급/갱신
+# BCrypt 해싱(로그인)이 ~50-100ms 소요되므로 타임아웃을 넉넉하게 설정
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: user-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: user-service
+spec:
+  hosts:
+    - user-service
+  http:
+    # POST /api/v1/auth/** — 인증 API (로그인/토큰 갱신)
+    # BCrypt + JWT 서명 포함, 쓰기이므로 connect-failure만 재시도
+    - match:
+        - uri:
+            prefix: /api/v1/auth
+      timeout: 5s
+      retries:
+        attempts: 2
+        perTryTimeout: 3s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: user-service
+            port:
+              number: 8081
+            subset: v1
+
+    # GET /api/v1/users/** — 프로필 조회 (읽기, 5xx도 재시도 가능)
+    - match:
+        - method:
+            exact: GET
+      timeout: 5s
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: user-service
+            port:
+              number: 8081
+            subset: v1
+
+    # 기본 라우트
+    - timeout: 5s
+      retries:
+        attempts: 2
+        perTryTimeout: 3s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: user-service
+            port:
+              number: 8081
+            subset: v1
+
+---
+# ── plan-service ─────────────────────────────────────────────────────────────
+# 핵심 API: GET /api/v1/plans/today (P95 < 200ms)
+# Cache-Aside: Redis HIT ~2-5ms, MISS ~10-25ms
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: plan-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: plan-service
+spec:
+  hosts:
+    - plan-service
+  http:
+    # GET /api/v1/plans/today — 오늘의 루틴 (가장 중요한 엔드포인트)
+    # 캐시 히트 기준 P95 < 200ms → timeout 2s (10배 헤드룸)
+    # 읽기 요청이므로 5xx에도 재시도 안전
+    - match:
+        - uri:
+            exact: /api/v1/plans/today
+      timeout: 2s
+      retries:
+        attempts: 3
+        perTryTimeout: 800ms
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: plan-service
+            port:
+              number: 8082
+            subset: v1
+
+    # GET /api/v1/plans/** — 루틴 목록/상세 조회 (읽기)
+    - match:
+        - method:
+            exact: GET
+          uri:
+            prefix: /api/v1/plans
+      timeout: 3s
+      retries:
+        attempts: 3
+        perTryTimeout: 1s
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: plan-service
+            port:
+              number: 8082
+            subset: v1
+
+    # POST/PUT/DELETE — 루틴 생성/수정/삭제 (쓰기, 멱등성 없음)
+    # 캐시 무효화 포함, connect-failure만 재시도
+    - timeout: 5s
+      retries:
+        attempts: 2
+        perTryTimeout: 3s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: plan-service
+            port:
+              number: 8082
+            subset: v1
+
+---
+# ── exercise-catalog ─────────────────────────────────────────────────────────
+# Elasticsearch 검색 P95 < 500ms
+# 읽기 비중이 높은 서비스 (CRUD + 검색)
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: exercise-catalog
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: exercise-catalog
+spec:
+  hosts:
+    - exercise-catalog
+  http:
+    # GET /api/v1/exercises/search — Elasticsearch 검색 (P95 < 500ms)
+    - match:
+        - uri:
+            prefix: /api/v1/exercises/search
+      timeout: 5s
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: exercise-catalog
+            port:
+              number: 8083
+            subset: v1
+
+    # GET /api/v1/exercises/** — 종목 목록/상세 (읽기)
+    - match:
+        - method:
+            exact: GET
+      timeout: 5s
+      retries:
+        attempts: 3
+        perTryTimeout: 2s
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: exercise-catalog
+            port:
+              number: 8083
+            subset: v1
+
+    # POST/PUT/DELETE — 종목 생성/수정/삭제 + ES 동기화 (쓰기)
+    - timeout: 10s
+      retries:
+        attempts: 2
+        perTryTimeout: 5s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: exercise-catalog
+            port:
+              number: 8083
+            subset: v1
+
+---
+# ── workout-service ──────────────────────────────────────────────────────────
+# 세트 기록 API P95 < 300ms (MongoDB $push + Kafka 비동기 발행)
+# 세트 기록은 운동 중 한 손으로 조작 → 응답 지연이 UX에 직결됨
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: workout-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: workout-service
+spec:
+  hosts:
+    - workout-service
+  http:
+    # POST /api/v1/sessions/{id}/sets — 세트 기록 (핵심 쓰기 API)
+    # MongoDB $push, Kafka 비동기 발행 포함
+    # 쓰기이므로 connect-failure만 재시도 (중복 기록 방지)
+    - match:
+        - uri:
+            regex: /api/v1/sessions/[^/]+/sets
+          method:
+            exact: POST
+      timeout: 3s
+      retries:
+        attempts: 2
+        perTryTimeout: 2s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: workout-service
+            port:
+              number: 8084
+            subset: v1
+
+    # GET /api/v1/sessions/** — 세션 조회 (읽기)
+    - match:
+        - method:
+            exact: GET
+      timeout: 3s
+      retries:
+        attempts: 3
+        perTryTimeout: 1s
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: workout-service
+            port:
+              number: 8084
+            subset: v1
+
+    # POST/PATCH /api/v1/sessions/** — 세션 시작/완료 (쓰기)
+    - timeout: 5s
+      retries:
+        attempts: 2
+        perTryTimeout: 3s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: workout-service
+            port:
+              number: 8084
+            subset: v1
+
+---
+# ── analytics-service ────────────────────────────────────────────────────────
+# Elasticsearch Aggregation 쿼리 — 처리 시간이 길 수 있음
+# Kafka Consumer 경로는 Kubernetes Service를 통하지 않으므로 여기서 다루지 않음
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: analytics-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: analytics-service
+spec:
+  hosts:
+    - analytics-service
+  http:
+    # GET /api/v1/analytics/** — 통계 조회 (ES Aggregation, 응답이 느릴 수 있음)
+    - match:
+        - method:
+            exact: GET
+      timeout: 15s
+      retries:
+        attempts: 2
+        perTryTimeout: 8s
+        retryOn: connect-failure,reset,5xx
+      route:
+        - destination:
+            host: analytics-service
+            port:
+              number: 8085
+            subset: v1
+
+    - timeout: 10s
+      retries:
+        attempts: 2
+        perTryTimeout: 5s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: analytics-service
+            port:
+              number: 8085
+            subset: v1
+
+---
+# ── notification-service ─────────────────────────────────────────────────────
+# Redis pub-sub 기반 휴식 타이머, FCM 푸시 알림
+# Kafka Consumer 경로는 Kubernetes Service를 통하지 않음
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: notification-service
+  namespace: gymplan-prod
+  labels:
+    app.kubernetes.io/part-of: gymplan
+    app.kubernetes.io/component: notification-service
+spec:
+  hosts:
+    - notification-service
+  http:
+    - timeout: 5s
+      retries:
+        attempts: 2
+        perTryTimeout: 3s
+        retryOn: connect-failure,reset
+      route:
+        - destination:
+            host: notification-service
+            port:
+              number: 8086
+            subset: v1

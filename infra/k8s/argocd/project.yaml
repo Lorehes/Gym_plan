@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: gymplan
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: GymPlan 전체 서비스 배포 프로젝트
+
+  # ── 소스 저장소 허용 목록 ──
+  sourceRepos:
+    - https://github.com/Lorehes/Gym_plan.git
+
+  # ── 배포 대상 클러스터/네임스페이스 허용 목록 ──
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: gymplan-prod
+    - server: https://kubernetes.default.svc
+      namespace: gymplan-stage
+    - server: https://kubernetes.default.svc
+      namespace: gymplan-infra
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+    - server: https://kubernetes.default.svc
+      namespace: argocd        # App of Apps 루트 앱 자신
+
+  # ── 배포 가능한 리소스 종류 ──
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+
+  namespaceResourceWhitelist:
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: Secret
+    - group: ""
+      kind: ServiceAccount
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: monitoring.coreos.com
+      kind: ServiceMonitor
+    - group: monitoring.coreos.com
+      kind: PrometheusRule
+    - group: argoproj.io
+      kind: Application   # App of Apps 허용
+
+  # ── 롤백/동기화 정책 ──
+  syncWindows:
+    # 매일 새벽 3~4시 KST(18~19 UTC)에 자동 배포 중지 (DB 정기 백업 시간)
+    - kind: deny
+      schedule: "0 18 * * *"
+      duration: 1h
+      applications:
+        - "*"
+      namespaces:
+        - gymplan-prod
+
+  # ── 알림 수신자 ──
+  roles:
+    - name: deploy-approver
+      description: 프로덕션 배포 승인 권한
+      policies:
+        - p, proj:gymplan:deploy-approver, applications, sync, gymplan/*, allow
+        - p, proj:gymplan:deploy-approver, applications, get,  gymplan/*, allow
+      groups:
+        - gymplan:backend-team

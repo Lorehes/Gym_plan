@@ -1,0 +1,282 @@
+# ─────────────────────────────────────────────
+# Thanos Query: 분산 쿼리 (Prometheus + Sidecar 통합)
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thanos-query
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thanos-query
+  template:
+    metadata:
+      labels:
+        app: thanos-query
+    spec:
+      containers:
+        - name: thanos-query
+          image: quay.io/thanos/thanos:v0.35.0
+          args:
+            - query
+            - --log.level=info
+            - --query.replica-label=replica
+            - --store=dnssrv+_grpc._tcp.thanos-store-grpc.monitoring.svc.cluster.local
+            - --store=dnssrv+_grpc._tcp.prometheus-operated.monitoring.svc.cluster.local
+          ports:
+            - name: http
+              containerPort: 10902
+            - name: grpc
+              containerPort: 10901
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: http
+            initialDelaySeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: http
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thanos-query
+  namespace: monitoring
+spec:
+  selector:
+    app: thanos-query
+  ports:
+    - name: http
+      port: 10902
+      targetPort: http
+    - name: grpc
+      port: 10901
+      targetPort: grpc
+---
+# ─────────────────────────────────────────────
+# Thanos Store Gateway: object storage → Prometheus 쿼리 연결
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: thanos-store
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thanos-store
+  serviceName: thanos-store
+  template:
+    metadata:
+      labels:
+        app: thanos-store
+    spec:
+      containers:
+        - name: thanos-store
+          image: quay.io/thanos/thanos:v0.35.0
+          args:
+            - store
+            - --log.level=info
+            - --data-dir=/var/thanos/store
+            - --objstore.config-file=/etc/thanos/objstore.yml
+            - --index-cache-size=500MB
+            - --chunk-pool-size=2GB
+          ports:
+            - name: http
+              containerPort: 10902
+            - name: grpc
+              containerPort: 10901
+          volumeMounts:
+            - name: data
+              mountPath: /var/thanos/store
+            - name: objstore-config
+              mountPath: /etc/thanos
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 4Gi
+      volumes:
+        - name: objstore-config
+          secret:
+            secretName: thanos-objstore-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: thanos-store-grpc
+  namespace: monitoring
+spec:
+  selector:
+    app: thanos-store
+  ports:
+    - name: grpc
+      port: 10901
+      targetPort: grpc
+---
+# ─────────────────────────────────────────────
+# Thanos Compactor: 장기 데이터 다운샘플링 및 압축
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: thanos-compactor
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thanos-compactor
+  serviceName: thanos-compactor
+  template:
+    metadata:
+      labels:
+        app: thanos-compactor
+    spec:
+      containers:
+        - name: thanos-compactor
+          image: quay.io/thanos/thanos:v0.35.0
+          args:
+            - compact
+            - --log.level=info
+            - --data-dir=/var/thanos/compact
+            - --objstore.config-file=/etc/thanos/objstore.yml
+            - --wait
+            - --retention.resolution-raw=30d   # raw 30일 보존
+            - --retention.resolution-5m=90d    # 5분 다운샘플 90일
+            - --retention.resolution-1h=1y     # 1시간 다운샘플 1년
+          volumeMounts:
+            - name: data
+              mountPath: /var/thanos/compact
+            - name: objstore-config
+              mountPath: /etc/thanos
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 2Gi
+      volumes:
+        - name: objstore-config
+          secret:
+            secretName: thanos-objstore-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+# ─────────────────────────────────────────────
+# Thanos Ruler: PrometheusRule를 Thanos에서도 평가
+# (장기 데이터 기반 알람용)
+# ─────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: thanos-ruler
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: thanos-ruler
+  serviceName: thanos-ruler
+  template:
+    metadata:
+      labels:
+        app: thanos-ruler
+    spec:
+      containers:
+        - name: thanos-ruler
+          image: quay.io/thanos/thanos:v0.35.0
+          args:
+            - rule
+            - --log.level=info
+            - --data-dir=/var/thanos/ruler
+            - --eval-interval=30s
+            - --rule-file=/etc/thanos/rules/*.yaml
+            - --objstore.config-file=/etc/thanos/objstore.yml
+            - --query=thanos-query.monitoring.svc.cluster.local:10902
+            - --label=ruler_cluster="gymplan-prod"
+            - --alert.label-drop=replica
+            - --alertmanagers.url=http://alertmanager.monitoring.svc.cluster.local:9093
+          ports:
+            - name: http
+              containerPort: 10902
+            - name: grpc
+              containerPort: 10901
+          volumeMounts:
+            - name: data
+              mountPath: /var/thanos/ruler
+            - name: objstore-config
+              mountPath: /etc/thanos
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+        - name: objstore-config
+          secret:
+            secretName: thanos-objstore-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+# ─────────────────────────────────────────────
+# Object Storage 설정 (Secret 템플릿)
+# 실제 값은 Vault에서 주입 — 하드코딩 금지
+# ─────────────────────────────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: thanos-objstore-config
+  namespace: monitoring
+  annotations:
+    # Vault Agent Injector가 이 Secret을 채움
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "monitoring"
+    vault.hashicorp.com/agent-inject-secret-objstore.yml: "secret/monitoring/thanos-objstore"
+type: Opaque
+# data는 Vault가 런타임에 주입
+# objstore.yml 형식 예시 (실제 값 Vault 저장):
+# type: S3
+# config:
+#   bucket: gymplan-thanos
+#   endpoint: s3.ap-northeast-2.amazonaws.com
+#   region: ap-northeast-2
+#   access_key: <vault-injected>
+#   secret_key: <vault-injected>
