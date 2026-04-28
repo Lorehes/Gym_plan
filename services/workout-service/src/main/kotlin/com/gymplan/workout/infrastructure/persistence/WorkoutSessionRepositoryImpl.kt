@@ -1,6 +1,7 @@
 package com.gymplan.workout.infrastructure.persistence
 
 import com.gymplan.workout.domain.entity.SessionExercise
+import com.gymplan.workout.domain.entity.SessionStatus
 import com.gymplan.workout.domain.entity.SetRecord
 import com.gymplan.workout.domain.repository.WorkoutSessionRepositoryCustom
 import org.bson.Document
@@ -140,21 +141,43 @@ class WorkoutSessionRepositoryImpl(
         totalSets: Int,
         notes: String?,
     ): Long {
-        // completedAt = null 조건 포함 → 원자적 중복 완료 방지
+        // status = IN_PROGRESS 조건 포함 → 원자적 중복 종료 방지
         val query =
             Query(
                 Criteria.where("_id").`is`(ObjectId(sessionId))
                     .and("userId").`is`(userId)
-                    .and("completedAt").isNull,
+                    .and("status").`is`(SessionStatus.IN_PROGRESS),
             )
         val update =
             Update()
+                .set("status", SessionStatus.COMPLETED)
                 .set("completedAt", completedAt)
                 .set("durationSec", durationSec)
                 .set("totalVolume", totalVolume)
                 .set("totalSets", totalSets)
 
         if (notes != null) update.set("notes", notes)
+
+        val result = mongoTemplate.updateFirst(query, update, COLLECTION)
+        return result.modifiedCount
+    }
+
+    override fun cancelSession(
+        sessionId: String,
+        userId: String,
+        cancelledAt: Instant,
+    ): Long {
+        // status = IN_PROGRESS 조건 포함 → 이미 종료된 세션의 재취소를 원자적으로 차단
+        val query =
+            Query(
+                Criteria.where("_id").`is`(ObjectId(sessionId))
+                    .and("userId").`is`(userId)
+                    .and("status").`is`(SessionStatus.IN_PROGRESS),
+            )
+        val update =
+            Update()
+                .set("status", SessionStatus.CANCELLED)
+                .set("completedAt", cancelledAt)
 
         val result = mongoTemplate.updateFirst(query, update, COLLECTION)
         return result.modifiedCount

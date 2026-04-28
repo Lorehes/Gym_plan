@@ -8,6 +8,7 @@ import com.gymplan.workout.application.dto.CompleteSessionRequest
 import com.gymplan.workout.application.dto.StartSessionRequest
 import com.gymplan.workout.application.event.WorkoutSessionCompletedEvent
 import com.gymplan.workout.domain.entity.SessionExercise
+import com.gymplan.workout.domain.entity.SessionStatus
 import com.gymplan.workout.domain.entity.SetRecord
 import com.gymplan.workout.domain.entity.WorkoutSession
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
@@ -208,6 +210,119 @@ class SessionServiceTest {
                 .isInstanceOf(ConflictException::class.java)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.SESSION_ALREADY_COMPLETED)
+        }
+    }
+
+    // ─────────────── 세션 취소 ───────────────
+
+    @Nested
+    @DisplayName("세션 취소")
+    inner class CancelSession {
+        @Test
+        @DisplayName("IN_PROGRESS 세션 취소 → CANCELLED 전이 + Kafka 미발행")
+        fun cancelSession_inProgress_success() {
+            val session =
+                WorkoutSession(
+                    id = "c1",
+                    userId = userIdStr,
+                    startedAt = Instant.now().minusSeconds(120),
+                    status = SessionStatus.IN_PROGRESS,
+                )
+            whenever(sessionRepository.findByIdAndUserId("c1", userIdStr)).thenReturn(session)
+            whenever(sessionRepository.cancelSession(any(), any(), any())).thenReturn(1L)
+
+            sessionService.cancelSession(userId, "c1")
+
+            verify(sessionRepository).cancelSession(eq("c1"), eq(userIdStr), any())
+            // Kafka 미발행 (analytics 미반영)
+            verify(eventPublisher, never()).publishSessionCompleted(any())
+        }
+
+        @Test
+        @DisplayName("이미 COMPLETED 세션 취소 시도 → SESSION_ALREADY_TERMINATED (409)")
+        fun cancelSession_alreadyCompleted_conflict() {
+            val session =
+                WorkoutSession(
+                    id = "c2",
+                    userId = userIdStr,
+                    completedAt = Instant.now().minusSeconds(60),
+                    status = SessionStatus.COMPLETED,
+                )
+            whenever(sessionRepository.findByIdAndUserId("c2", userIdStr)).thenReturn(session)
+
+            assertThatThrownBy { sessionService.cancelSession(userId, "c2") }
+                .isInstanceOf(ConflictException::class.java)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SESSION_ALREADY_TERMINATED)
+
+            verify(sessionRepository, never()).cancelSession(any(), any(), any())
+            verify(eventPublisher, never()).publishSessionCompleted(any())
+        }
+
+        @Test
+        @DisplayName("이미 CANCELLED 세션 재취소 → SESSION_ALREADY_TERMINATED (409)")
+        fun cancelSession_alreadyCancelled_conflict() {
+            val session =
+                WorkoutSession(
+                    id = "c3",
+                    userId = userIdStr,
+                    completedAt = Instant.now().minusSeconds(30),
+                    status = SessionStatus.CANCELLED,
+                )
+            whenever(sessionRepository.findByIdAndUserId("c3", userIdStr)).thenReturn(session)
+
+            assertThatThrownBy { sessionService.cancelSession(userId, "c3") }
+                .isInstanceOf(ConflictException::class.java)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SESSION_ALREADY_TERMINATED)
+
+            verify(sessionRepository, never()).cancelSession(any(), any(), any())
+        }
+
+        @Test
+        @DisplayName("타인 세션 취소 시도 → 401 (소유권 노출 방지)")
+        fun cancelSession_otherUser_unauthorized() {
+            whenever(sessionRepository.findByIdAndUserId("other", userIdStr)).thenReturn(null)
+            whenever(sessionRepository.existsById("other")).thenReturn(true)
+
+            assertThatThrownBy { sessionService.cancelSession(userId, "other") }
+                .isInstanceOf(UnauthorizedException::class.java)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.AUTH_INVALID_TOKEN)
+
+            verify(sessionRepository, never()).cancelSession(any(), any(), any())
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 sessionId 취소 → SESSION_NOT_FOUND (404)")
+        fun cancelSession_notFound() {
+            whenever(sessionRepository.findByIdAndUserId("nope", userIdStr)).thenReturn(null)
+            whenever(sessionRepository.existsById("nope")).thenReturn(false)
+
+            assertThatThrownBy { sessionService.cancelSession(userId, "nope") }
+                .isInstanceOf(NotFoundException::class.java)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SESSION_NOT_FOUND)
+        }
+
+        @Test
+        @DisplayName("DB 레벨 동시성 — modifiedCount=0이면 SESSION_ALREADY_TERMINATED")
+        fun cancelSession_raceCondition() {
+            val session =
+                WorkoutSession(
+                    id = "c4",
+                    userId = userIdStr,
+                    startedAt = Instant.now().minusSeconds(60),
+                    status = SessionStatus.IN_PROGRESS,
+                )
+            whenever(sessionRepository.findByIdAndUserId("c4", userIdStr)).thenReturn(session)
+            // 다른 스레드가 먼저 종료 → 원자적 업데이트 실패
+            whenever(sessionRepository.cancelSession(any(), any(), any())).thenReturn(0L)
+
+            assertThatThrownBy { sessionService.cancelSession(userId, "c4") }
+                .isInstanceOf(ConflictException::class.java)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SESSION_ALREADY_TERMINATED)
         }
     }
 

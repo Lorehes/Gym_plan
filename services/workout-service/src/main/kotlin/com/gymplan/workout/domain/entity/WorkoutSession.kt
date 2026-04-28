@@ -11,7 +11,8 @@ import java.time.Instant
  *
  * 설계 원칙 (docs/database/mongodb-schema.md):
  *  - 세션 전체(exercises + sets)를 단일 문서로 관리 → JOIN 없이 저지연 읽기/쓰기
- *  - completedAt = null → IN_PROGRESS, not null → COMPLETED
+ *  - status: IN_PROGRESS / COMPLETED / CANCELLED 중 하나
+ *  - completedAt: 종료 시각 (COMPLETED 또는 CANCELLED 일 때 설정)
  *  - planName, exerciseName 비정규화 스냅샷 — 원본 삭제 후에도 기록 보존
  *
  * 인덱스:
@@ -30,9 +31,17 @@ data class WorkoutSession(
     val planName: String? = null,
     val startedAt: Instant = Instant.now(),
     val completedAt: Instant? = null,
+    val status: String = SessionStatus.IN_PROGRESS,
     val totalVolume: Double = 0.0,
     val totalSets: Int = 0,
     val durationSec: Long = 0,
     val notes: String? = null,
     val exercises: List<SessionExercise> = emptyList(),
 )
+
+/** 세션 상태 상수. enum 대신 String 상수 — MongoDB 직렬화 호환성 ↑ */
+object SessionStatus {
+    const val IN_PROGRESS = "IN_PROGRESS"
+    const val COMPLETED = "COMPLETED"
+    const val CANCELLED = "CANCELLED"
+}
