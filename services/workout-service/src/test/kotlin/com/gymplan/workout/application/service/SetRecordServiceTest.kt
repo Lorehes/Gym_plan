@@ -8,6 +8,8 @@ import com.gymplan.workout.domain.entity.SetRecord
 import com.gymplan.workout.domain.entity.WorkoutSession
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import com.gymplan.workout.infrastructure.messaging.WorkoutEventPublisher
+import com.gymplan.workout.infrastructure.metrics.WorkoutMetrics
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -42,7 +44,7 @@ class SetRecordServiceTest {
         sessionRepository = mock()
         eventPublisher = mock()
         sessionService = mock()
-        setRecordService = SetRecordService(sessionRepository, sessionService, eventPublisher)
+        setRecordService = SetRecordService(sessionRepository, sessionService, eventPublisher, WorkoutMetrics(SimpleMeterRegistry()))
     }
 
     private fun buildActiveSession() =

@@ -23,9 +23,9 @@ class NotificationSettingsService(
         val updated =
             NotificationSettings(
                 userId = userId,
-                restTimerEnabled = request.restTimerEnabled ?: current.restTimerEnabled,
-                workoutCompleteAlert = request.workoutCompleteAlert ?: current.workoutCompleteAlert,
-                pushEnabled = request.pushEnabled ?: current.pushEnabled,
+                restTimerEnabled = request.restTimerEnabled,
+                workoutCompleteAlert = request.workoutCompleteAlert,
+                pushEnabled = request.pushEnabled,
             )
         settingsRepository.save(updated)
         return updated.toResponse()

@@ -31,7 +31,7 @@ class KafkaConsumerConfig(
     fun consumerFactory(): ConsumerFactory<String, Any> {
         val deserializer =
             JsonDeserializer<Any>().apply {
-                addTrustedPackages("*")
+                addTrustedPackages("com.gymplan.notification.infrastructure.kafka")
                 setUseTypeHeaders(false)
             }
 

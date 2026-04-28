@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size
 /** POST /api/v1/sessions */
 data class StartSessionRequest(
     val planId: Long? = null,
-    val planName: String? = null,
+    @field:Size(max = 200) val planName: String? = null,
 )
 
 /** POST /api/v1/sessions/{sessionId}/sets */

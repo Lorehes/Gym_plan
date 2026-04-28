@@ -32,6 +32,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // JWT (RS256) — common-security 에서 사용하는 것과 같은 버전
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")

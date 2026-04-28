@@ -10,6 +10,7 @@ import com.gymplan.workout.application.event.WorkoutSetLoggedEvent
 import com.gymplan.workout.domain.entity.SetRecord
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import com.gymplan.workout.infrastructure.messaging.WorkoutEventPublisher
+import com.gymplan.workout.infrastructure.metrics.WorkoutMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -30,6 +31,7 @@ class SetRecordService(
     private val sessionRepository: WorkoutSessionRepository,
     private val sessionService: SessionService,
     private val eventPublisher: WorkoutEventPublisher,
+    private val workoutMetrics: WorkoutMetrics,
 ) {
     private val log = LoggerFactory.getLogger(SetRecordService::class.java)
 
@@ -71,6 +73,7 @@ class SetRecordService(
             throw ConflictException(ErrorCode.SESSION_ALREADY_COMPLETED)
         }
 
+        workoutMetrics.setsLogged.increment()
         log.info(
             "세트 기록: userId={}, sessionId={}, exerciseId={}, setNo={}",
             userId,

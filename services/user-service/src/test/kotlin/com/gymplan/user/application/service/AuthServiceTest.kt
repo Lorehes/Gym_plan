@@ -13,6 +13,8 @@ import com.gymplan.user.domain.entity.User
 import com.gymplan.user.domain.entity.UserStatus
 import com.gymplan.user.domain.repository.UserRepository
 import com.gymplan.user.infrastructure.cache.TokenStore
+import com.gymplan.user.infrastructure.metrics.UserMetrics
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -55,6 +57,7 @@ class AuthServiceTest {
                 passwordEncoder = passwordEncoder,
                 jwtProvider = jwtProvider,
                 tokenStore = tokenStore,
+                userMetrics = UserMetrics(SimpleMeterRegistry()),
             )
     }
 

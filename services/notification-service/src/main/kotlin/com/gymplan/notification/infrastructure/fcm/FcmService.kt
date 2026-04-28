@@ -1,6 +1,7 @@
 package com.gymplan.notification.infrastructure.fcm
 
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.Message
 import com.google.firebase.messaging.Notification
 import com.gymplan.notification.infrastructure.redis.FcmTokenRepository
@@ -38,8 +39,14 @@ class FcmService(
                 .putData("sessionId", sessionId)
                 .build()
 
-        FirebaseMessaging.getInstance().send(message)
-        log.info("FCM 운동 완료 알림 발송: userId={}, sessionId={}", userId, sessionId)
+        try {
+            FirebaseMessaging.getInstance().send(message)
+            log.info("FCM 운동 완료 알림 발송: userId={}, sessionId={}", userId, sessionId)
+        } catch (e: FirebaseMessagingException) {
+            log.error("FCM 운동 완료 알림 발송 실패: userId={}, sessionId={}, errorCode={}",
+                userId, sessionId, e.messagingErrorCode, e)
+            throw e
+        }
     }
 
     fun sendWelcome(userId: Long) {
@@ -61,7 +68,12 @@ class FcmService(
                 .putData("userId", userId.toString())
                 .build()
 
-        FirebaseMessaging.getInstance().send(message)
-        log.info("FCM 환영 알림 발송: userId={}", userId)
+        try {
+            FirebaseMessaging.getInstance().send(message)
+            log.info("FCM 환영 알림 발송: userId={}", userId)
+        } catch (e: FirebaseMessagingException) {
+            log.error("FCM 환영 알림 발송 실패: userId={}, errorCode={}", userId, e.messagingErrorCode, e)
+            throw e
+        }
     }
 }

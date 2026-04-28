@@ -4,6 +4,7 @@ import com.gymplan.plan.application.dto.TodayPlanResponse
 import com.gymplan.plan.application.dto.toTodayPlanResponse
 import com.gymplan.plan.domain.repository.WorkoutPlanRepository
 import com.gymplan.plan.infrastructure.cache.PlanCacheManager
+import com.gymplan.plan.infrastructure.metrics.PlanMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -27,6 +28,7 @@ import java.time.ZoneId
 class TodayPlanService(
     private val workoutPlanRepository: WorkoutPlanRepository,
     private val planCacheManager: PlanCacheManager,
+    private val planMetrics: PlanMetrics,
 ) {
     private val log = LoggerFactory.getLogger(TodayPlanService::class.java)
 
@@ -38,9 +40,11 @@ class TodayPlanService(
     fun getTodayPlan(userId: Long): TodayPlanResponse? {
         // 1. 캐시 조회
         planCacheManager.getTodayPlan(userId)?.let {
+            planMetrics.todayPlanCacheHit.increment()
             log.debug("오늘의 루틴 캐시 HIT: userId={}", userId)
             return it
         }
+        planMetrics.todayPlanCacheMiss.increment()
 
         // 2. 캐시 미스 → DB 조회
         val todayDow = todayDayOfWeek()

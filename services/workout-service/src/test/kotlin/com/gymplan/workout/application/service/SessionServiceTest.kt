@@ -12,6 +12,8 @@ import com.gymplan.workout.domain.entity.SetRecord
 import com.gymplan.workout.domain.entity.WorkoutSession
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import com.gymplan.workout.infrastructure.messaging.WorkoutEventPublisher
+import com.gymplan.workout.infrastructure.metrics.WorkoutMetrics
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.BeforeEach
@@ -44,7 +46,7 @@ class SessionServiceTest {
     fun setUp() {
         sessionRepository = mock()
         eventPublisher = mock()
-        sessionService = SessionService(sessionRepository, eventPublisher)
+        sessionService = SessionService(sessionRepository, eventPublisher, WorkoutMetrics(SimpleMeterRegistry()))
     }
 
     // ─────────────── TC-01: 정상 세션 시작 ───────────────

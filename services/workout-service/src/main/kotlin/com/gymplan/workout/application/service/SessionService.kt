@@ -17,6 +17,7 @@ import com.gymplan.workout.application.event.WorkoutSessionCompletedEvent
 import com.gymplan.workout.domain.entity.WorkoutSession
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import com.gymplan.workout.infrastructure.messaging.WorkoutEventPublisher
+import com.gymplan.workout.infrastructure.metrics.WorkoutMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
@@ -37,6 +38,7 @@ import java.time.temporal.ChronoUnit
 class SessionService(
     private val sessionRepository: WorkoutSessionRepository,
     private val eventPublisher: WorkoutEventPublisher,
+    private val workoutMetrics: WorkoutMetrics,
 ) {
     private val log = LoggerFactory.getLogger(SessionService::class.java)
 
@@ -61,6 +63,7 @@ class SessionService(
                 planName = request.planName,
             )
         val saved = sessionRepository.save(session)
+        workoutMetrics.sessionsStarted.increment()
         log.info("세션 시작: userId={}, sessionId={}", userId, saved.id)
 
         return StartSessionResponse(
@@ -118,6 +121,7 @@ class SessionService(
             throw ConflictException(ErrorCode.SESSION_ALREADY_COMPLETED)
         }
 
+        workoutMetrics.sessionsCompleted.increment()
         log.info(
             "세션 완료: userId={}, sessionId={}, durationSec={}, totalVolume={}, totalSets={}",
             userId,

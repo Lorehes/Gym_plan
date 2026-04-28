@@ -46,7 +46,7 @@ class SecurityConfig {
                         "capacitor://localhost",
                     )
                 allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                allowedHeaders = listOf("*")
+                allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "X-Requested-With")
                 allowCredentials = true
                 maxAge = MAX_AGE_SECONDS
             }

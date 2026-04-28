@@ -14,6 +14,7 @@ import com.gymplan.user.application.dto.TokenRefreshResponse
 import com.gymplan.user.domain.entity.User
 import com.gymplan.user.domain.repository.UserRepository
 import com.gymplan.user.infrastructure.cache.TokenStore
+import com.gymplan.user.infrastructure.metrics.UserMetrics
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -31,6 +32,7 @@ class AuthService(
     private val passwordEncoder: PasswordEncoder,
     private val jwtProvider: JwtProvider,
     private val tokenStore: TokenStore,
+    private val userMetrics: UserMetrics,
 ) {
     private val log = LoggerFactory.getLogger(AuthService::class.java)
 
@@ -68,6 +70,7 @@ class AuthService(
             }
 
         val tokens = issueTokens(saved)
+        userMetrics.registrations.increment()
         log.info("신규 회원가입 완료: userId={}, email={}", saved.id, maskEmail(saved.email))
 
         return RegisterResponse(
@@ -112,6 +115,7 @@ class AuthService(
 
         tokenStore.clearLoginFailures(emailLower)
         val tokens = issueTokens(user)
+        userMetrics.activeUsers.increment()
         log.info("로그인 성공: userId={}, email={}", user.id, maskEmail(user.email))
 
         return LoginResponse(

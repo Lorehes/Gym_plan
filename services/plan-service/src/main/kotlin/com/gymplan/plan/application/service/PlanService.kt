@@ -78,14 +78,18 @@ class PlanService(
 
     @Transactional
     fun updatePlan(userId: Long, planId: Long, request: UpdatePlanRequest): PlanDetailResponse {
-        val plan = findPlanForUser(userId, planId)
+        // exercises 포함 로딩 → 이후 toDetailResponse()에서 추가 쿼리 불필요
+        val plan = workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)
+            ?: throw NotFoundException(ErrorCode.PLAN_NOT_FOUND)
+        if (plan.userId != userId) throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
+
         plan.update(request.name, request.description, request.dayOfWeek)
         workoutPlanRepository.save(plan)
 
         planCacheManager.evictPlanCaches(userId, planId)
         log.info("루틴 수정: userId={}, planId={}", userId, planId)
 
-        return workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)!!.toDetailResponse()
+        return plan.toDetailResponse()
     }
 
     @Transactional

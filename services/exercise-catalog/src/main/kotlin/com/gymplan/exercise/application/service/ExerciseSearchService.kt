@@ -5,6 +5,7 @@ import com.gymplan.exercise.application.dto.ExerciseSummaryResponse
 import com.gymplan.exercise.domain.vo.Equipment
 import com.gymplan.exercise.domain.vo.MuscleGroup
 import com.gymplan.exercise.infrastructure.search.ExerciseSearchRepository
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.stereotype.Service
 
 /**
@@ -19,6 +20,10 @@ import org.springframework.stereotype.Service
 class ExerciseSearchService(
     private val exerciseSearchRepository: ExerciseSearchRepository,
 ) {
+    @Cacheable(
+        cacheNames = ["exerciseSearch"],
+        key = "#query + ':' + #muscle + ':' + #equipment + ':' + #page + ':' + #size",
+    )
     fun search(
         query: String?,
         muscle: MuscleGroup?,
