@@ -22,6 +22,7 @@ const planA: TodayPlan = {
       targetReps: 10,
       targetWeightKg: 60,
       restSeconds: 90,
+      notes: null,
     },
     {
       id: 2,
@@ -33,6 +34,7 @@ const planA: TodayPlan = {
       targetReps: 8,
       targetWeightKg: 40,
       restSeconds: 60,
+      notes: null,
     },
   ],
 };

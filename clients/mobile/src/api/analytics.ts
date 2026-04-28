@@ -13,12 +13,15 @@ export interface AnalyticsSummary {
   mostTrainedMuscle: string;
 }
 
+// 백엔드 PersonalRecordResponse(analytics-service) 와 1:1 대응.
+// isReliable: 표본 수/세트 신뢰성 플래그 (Epley 추정의 신뢰도 표시용).
 export interface PersonalRecord {
   exerciseId: string;
   exerciseName: string;
   maxWeightKg: number;
   maxReps: number;
   estimated1RM: number;
+  isReliable: boolean;
   achievedAt: string;
 }
 

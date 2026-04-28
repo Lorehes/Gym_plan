@@ -99,9 +99,8 @@ export async function completeSession(
 }
 
 // 세션 중도 포기 — /complete와 대칭 패턴(POST /cancel).
-// 서버 status를 CANCELLED로 마킹하고 큐 정리. analytics 이벤트는 발행하지 않음.
-// (주의: workout-service.md에 명시되지 않은 엔드포인트 — 백엔드 추가 필요.
-// 미구현 시 404/405 반환되며, 호출자가 graceful fallback 처리.)
+// 서버 status를 CANCELLED로 마킹. Kafka 이벤트는 발행하지 않음.
+// 백엔드: WorkoutSessionController.cancelSession (204 No Content).
 export async function cancelSession(sessionId: string): Promise<void> {
   await apiClient.post(`/sessions/${sessionId}/cancel`);
 }

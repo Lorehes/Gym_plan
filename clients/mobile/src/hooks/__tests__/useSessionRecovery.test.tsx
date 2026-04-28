@@ -42,6 +42,7 @@ const planSame: TodayPlan = {
       targetReps: 10,
       targetWeightKg: 50,
       restSeconds: 60,
+      notes: null,
     },
   ],
 };

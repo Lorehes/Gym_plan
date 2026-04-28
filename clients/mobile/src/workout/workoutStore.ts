@@ -77,16 +77,18 @@ function reconstructFromExercises(exercises: ActiveExercise[]): ExerciseProgress
 }
 
 function planExerciseToProgress(e: PlanExercise): ExerciseProgress {
+  // 맨몸 운동(BODYWEIGHT)은 targetWeightKg=null — 로컬 상태에서는 0kg 으로 처리.
+  const weight = e.targetWeightKg ?? 0;
   return {
     exerciseId: e.exerciseId,
     exerciseName: e.exerciseName,
     muscleGroup: e.muscleGroup,
     targetSets: e.targetSets,
     targetReps: e.targetReps,
-    targetWeightKg: e.targetWeightKg,
+    targetWeightKg: weight,
     restSeconds: e.restSeconds,
     currentReps: e.targetReps,
-    currentWeightKg: e.targetWeightKg,
+    currentWeightKg: weight,
     completedSets: [],
   };
 }

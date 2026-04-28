@@ -165,13 +165,15 @@ function RoutineCard({ plan, dayLabel }: RoutineCardProps) {
 }
 
 function ExerciseRow({ exercise }: { exercise: PlanExercise }) {
+  // 맨몸 운동(BODYWEIGHT)은 targetWeightKg=null — "맨몸"으로 표기.
+  const weightLabel = exercise.targetWeightKg == null ? '맨몸' : `${exercise.targetWeightKg}kg`;
   return (
     <View style={styles.exerciseRow}>
       <Text style={{ ...textStyles.body, color: colors.text, flex: 1 }} numberOfLines={1}>
         {exercise.exerciseName}
       </Text>
       <Text style={{ ...textStyles.bodySm, color: colors.textMuted }}>
-        {exercise.targetSets}×{exercise.targetReps} · {exercise.targetWeightKg}kg
+        {exercise.targetSets}×{exercise.targetReps} · {weightLabel}
       </Text>
     </View>
   );
