@@ -14,6 +14,7 @@ import com.gymplan.workout.application.dto.StartSessionResponse
 import com.gymplan.workout.application.dto.toDetailResponse
 import com.gymplan.workout.application.dto.toSummaryResponse
 import com.gymplan.workout.application.event.WorkoutSessionCompletedEvent
+import com.gymplan.workout.domain.entity.SessionStatus
 import com.gymplan.workout.domain.entity.WorkoutSession
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import com.gymplan.workout.infrastructure.messaging.WorkoutEventPublisher
@@ -154,6 +155,42 @@ class SessionService(
             totalVolume = totalVolume,
             totalSets = totalSets,
         )
+    }
+
+    // ─────────────────── 세션 취소 ───────────────────
+
+    /**
+     * 진행 중 세션을 취소(CANCELLED) 상태로 종료한다.
+     *
+     * 정책:
+     *  - 본인 세션만 (소유자 검증은 findSessionForUser 내에서 수행)
+     *  - IN_PROGRESS → CANCELLED 만 허용. 이미 종료된 세션은 SESSION_ALREADY_TERMINATED (409)
+     *  - Kafka 이벤트 미발행 — 취소 세션은 analytics 통계에 반영하지 않음
+     *  - 응답 본문 없음 (controller 에서 204 No Content)
+     */
+    fun cancelSession(
+        userId: Long,
+        sessionId: String,
+    ) {
+        val userIdStr = userId.toString()
+        val session = findSessionForUser(sessionId, userIdStr)
+
+        if (session.status != SessionStatus.IN_PROGRESS) {
+            throw ConflictException(ErrorCode.SESSION_ALREADY_TERMINATED)
+        }
+
+        // status = IN_PROGRESS 조건의 원자적 업데이트 → 동시성 안전
+        val modified =
+            sessionRepository.cancelSession(
+                sessionId = sessionId,
+                userId = userIdStr,
+                cancelledAt = Instant.now(),
+            )
+        if (modified == 0L) {
+            throw ConflictException(ErrorCode.SESSION_ALREADY_TERMINATED)
+        }
+
+        log.info("세션 취소: userId={}, sessionId={}", userId, sessionId)
     }
 
     // ─────────────────── 히스토리 조회 ───────────────────

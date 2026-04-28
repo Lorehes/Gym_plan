@@ -39,6 +39,7 @@ enum class ErrorCode(
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "SESSION_NOT_FOUND", "운동 세션을 찾을 수 없습니다."),
     SESSION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "SESSION_ALREADY_ACTIVE", "이미 진행 중인 세션이 있습니다."),
     SESSION_ALREADY_COMPLETED(HttpStatus.CONFLICT, "SESSION_ALREADY_COMPLETED", "이미 완료된 세션입니다."),
+    SESSION_ALREADY_TERMINATED(HttpStatus.CONFLICT, "SESSION_ALREADY_TERMINATED", "이미 종료된 세션입니다."),
 
     // ───── 알림 (notification-service) ─────
     NOTIFICATION_ACCESS_DENIED(HttpStatus.FORBIDDEN, "NOTIFICATION_ACCESS_DENIED", "해당 세션에 대한 접근 권한이 없습니다."),

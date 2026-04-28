@@ -54,7 +54,7 @@ interface WorkoutSessionRepositoryCustom {
 
     /**
      * 운동 완료 처리 — 원자적 업데이트.
-     * completedAt = null 조건을 filter에 포함해 중복 완료를 DB 레벨에서 방지한다.
+     * status = "IN_PROGRESS" 조건을 filter에 포함해 중복 완료를 DB 레벨에서 방지한다.
      *
      * @return 수정된 문서 수 (0이면 이미 완료된 세션)
      */
@@ -66,5 +66,18 @@ interface WorkoutSessionRepositoryCustom {
         totalVolume: Double,
         totalSets: Int,
         notes: String?,
+    ): Long
+
+    /**
+     * 운동 세션 취소 처리 — 원자적 업데이트.
+     * status = "IN_PROGRESS" 조건으로 이미 종료된 세션의 재취소를 DB 레벨에서 방지한다.
+     * Kafka 이벤트는 발행하지 않는다 (analytics 미반영).
+     *
+     * @return 수정된 문서 수 (0이면 이미 종료된 세션)
+     */
+    fun cancelSession(
+        sessionId: String,
+        userId: String,
+        cancelledAt: Instant,
     ): Long
 }

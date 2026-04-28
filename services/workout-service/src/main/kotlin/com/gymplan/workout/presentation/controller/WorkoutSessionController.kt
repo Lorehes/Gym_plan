@@ -70,6 +70,21 @@ class WorkoutSessionController(
         @Valid @RequestBody request: CompleteSessionRequest,
     ): ApiResponse<CompleteSessionResponse> = ApiResponse.success(sessionService.completeSession(userId, sessionId, request))
 
+    /**
+     * 운동 세션 취소 (IN_PROGRESS → CANCELLED).
+     * - 본인 세션만 (X-User-Id 검증)
+     * - 이미 종료된 세션이면 409 SESSION_ALREADY_TERMINATED
+     * - 응답: 204 No Content (Kafka 이벤트 발행 안 함)
+     */
+    @PostMapping("/{sessionId}/cancel")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun cancelSession(
+        @CurrentUserId userId: Long,
+        @PathVariable sessionId: String,
+    ) {
+        sessionService.cancelSession(userId, sessionId)
+    }
+
     /** 운동 히스토리 (페이징). */
     @GetMapping("/history")
     fun getHistory(

@@ -1,5 +1,6 @@
 package com.gymplan.workout.integration
 
+import com.gymplan.workout.domain.entity.SessionStatus
 import com.gymplan.workout.domain.repository.WorkoutSessionRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -358,6 +359,125 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
                 status { isConflict() }
                 jsonPath("$.error.code") { value("SESSION_ALREADY_COMPLETED") }
             }
+        }
+    }
+
+    // ─────────────────── 세션 취소 ───────────────────
+
+    @Nested
+    @DisplayName("세션 취소")
+    inner class CancelSession {
+        private fun startSession(asUser: Long = userId): String {
+            val result =
+                mockMvc.post("/api/v1/sessions") {
+                    header("X-User-Id", asUser)
+                    contentType = MediaType.APPLICATION_JSON
+                    content = "{}"
+                }.andReturn()
+            return com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(result.response.contentAsString)["data"]["sessionId"].asText()
+        }
+
+        @Test
+        @DisplayName("IN_PROGRESS 세션 취소 → 204 No Content + status=CANCELLED + 새 세션 시작 가능")
+        fun `cancel - IN_PROGRESS 세션 취소`() {
+            val sessionId = startSession()
+
+            mockMvc.post("/api/v1/sessions/$sessionId/cancel") {
+                header("X-User-Id", userId)
+            }.andExpect {
+                status { isNoContent() }
+            }
+
+            val session = sessionRepository.findById(sessionId).orElseThrow()
+            assertThat(session.status).isEqualTo(SessionStatus.CANCELLED)
+            assertThat(session.completedAt).isNotNull
+
+            // 취소 후 새 세션 시작 가능 — 활성 세션 검색에서 제외됨
+            assertThat(sessionRepository.findByUserIdAndCompletedAtIsNull(userId.toString())).isNull()
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andExpect { status { isCreated() } }
+        }
+
+        @Test
+        @DisplayName("이미 COMPLETED 세션 취소 시도 → 409 SESSION_ALREADY_TERMINATED")
+        fun `cancel - COMPLETED 세션 차단`() {
+            val sessionId = startSession()
+
+            mockMvc.post("/api/v1/sessions/$sessionId/complete") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = "{}"
+            }.andExpect { status { isOk() } }
+
+            mockMvc.post("/api/v1/sessions/$sessionId/cancel") {
+                header("X-User-Id", userId)
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.error.code") { value("SESSION_ALREADY_TERMINATED") }
+            }
+
+            // 상태 그대로 COMPLETED
+            val session = sessionRepository.findById(sessionId).orElseThrow()
+            assertThat(session.status).isEqualTo(SessionStatus.COMPLETED)
+        }
+
+        @Test
+        @DisplayName("이미 CANCELLED 세션 재취소 → 409 SESSION_ALREADY_TERMINATED")
+        fun `cancel - CANCELLED 세션 재취소 차단`() {
+            val sessionId = startSession()
+
+            mockMvc.post("/api/v1/sessions/$sessionId/cancel") {
+                header("X-User-Id", userId)
+            }.andExpect { status { isNoContent() } }
+
+            mockMvc.post("/api/v1/sessions/$sessionId/cancel") {
+                header("X-User-Id", userId)
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.error.code") { value("SESSION_ALREADY_TERMINATED") }
+            }
+        }
+
+        @Test
+        @DisplayName("타인 세션 취소 시도 → 401 (소유권 노출 방지)")
+        fun `cancel - 타인 세션 401`() {
+            val sessionId = startSession(asUser = userId)
+
+            mockMvc.post("/api/v1/sessions/$sessionId/cancel") {
+                header("X-User-Id", otherUserId)
+            }.andExpect {
+                status { isUnauthorized() }
+            }
+
+            // 세션이 여전히 IN_PROGRESS
+            val session = sessionRepository.findById(sessionId).orElseThrow()
+            assertThat(session.status).isEqualTo(SessionStatus.IN_PROGRESS)
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 sessionId 취소 → 404 SESSION_NOT_FOUND")
+        fun `cancel - 존재하지 않는 세션 404`() {
+            val nonexistentId = org.bson.types.ObjectId().toHexString()
+
+            mockMvc.post("/api/v1/sessions/$nonexistentId/cancel") {
+                header("X-User-Id", userId)
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.error.code") { value("SESSION_NOT_FOUND") }
+            }
+        }
+
+        @Test
+        @DisplayName("X-User-Id 헤더 없으면 401")
+        fun `cancel - 인증 헤더 없음`() {
+            val sessionId = startSession()
+
+            mockMvc.post("/api/v1/sessions/$sessionId/cancel") {
+            }.andExpect { status { isUnauthorized() } }
         }
     }
 
