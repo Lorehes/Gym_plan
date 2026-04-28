@@ -79,6 +79,73 @@ abstract class AbstractE2ETest {
             val password: String,
             val accessToken: String,
         )
+
+        // ── 시나리오 헬퍼 ────────────────────────────────────────────────
+        // KST 기준 오늘 요일 (0=월, 1=화, ..., 6=일).
+        // plan-service TodayPlanService.todayDayOfWeek() 와 같은 계산.
+        fun todayDayOfWeekKst(): Int =
+            java.time.LocalDate
+                .now(java.time.ZoneId.of("Asia/Seoul"))
+                .dayOfWeek.value - 1
+
+        /** dayOfWeek=오늘로 루틴을 생성하고 planId 를 반환한다. */
+        fun createPlanForToday(accessToken: String, name: String): Long {
+            val body = mapOf(
+                "name"        to name,
+                "description" to "E2E auto-created",
+                "dayOfWeek"   to todayDayOfWeekKst(),
+            )
+            return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer $accessToken")
+                .body(body)
+                .post("/api/v1/plans")
+                .then().statusCode(201)
+                .extract().jsonPath().getLong("data.planId")
+        }
+
+        /** 루틴에 운동 항목 1개를 추가한다 (벤치프레스 가정값). */
+        fun addBenchExercise(accessToken: String, planId: Long): Long {
+            val body = mapOf(
+                "exerciseId"     to 1,             // catalog 미연동, 비정규화 저장
+                "exerciseName"   to "벤치프레스",
+                "muscleGroup"    to "CHEST",
+                "targetSets"     to 4,
+                "targetReps"     to 10,
+                "targetWeightKg" to 70.0,
+                "restSeconds"    to 90,
+            )
+            return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer $accessToken")
+                .body(body)
+                .post("/api/v1/plans/$planId/exercises")
+                .then().statusCode(org.hamcrest.Matchers.oneOf(200, 201))
+                .extract().jsonPath().getLong("data.id")
+        }
+
+        /** 커스텀 운동 종목을 등록하고 exerciseId 를 반환한다. */
+        fun createCustomExercise(
+            accessToken: String,
+            name: String,
+            muscleGroup: String = "CHEST",
+            equipment: String = "BARBELL",
+            difficulty: String = "INTERMEDIATE",
+        ): Long {
+            val body = mapOf(
+                "name"        to name,
+                "muscleGroup" to muscleGroup,
+                "equipment"   to equipment,
+                "difficulty"  to difficulty,
+            )
+            return RestAssured.given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer $accessToken")
+                .body(body)
+                .post("/api/v1/exercises")
+                .then().statusCode(201)
+                .extract().jsonPath().getLong("data.exerciseId")
+        }
     }
 }
 
