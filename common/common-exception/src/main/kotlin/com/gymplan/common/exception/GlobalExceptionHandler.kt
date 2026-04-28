@@ -70,7 +70,7 @@ class GlobalExceptionHandler {
         log.info("[VALIDATION_FAILED] 요청 본문 파싱 실패: {}", ex.message)
         return ResponseEntity
             .status(ec.status)
-            .body(ApiResponse.failure(code = ec.code, message = "요청 본문 형식이 올바르지 않습니다"))
+            .body(ApiResponse.failure(code = ec.code, message = "요청 본문 형식이 올바르지 않습니다."))
     }
 
     @ExceptionHandler(MethodArgumentNotValidException::class)

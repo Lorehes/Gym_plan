@@ -46,9 +46,12 @@ class JwtProvider(
     ): String {
         val key = privateKey ?: error("privateKey 없이 토큰 발급 불가 — user-service 만 발급 가능")
         val now = Instant.now()
+        // iat 는 초 단위 해상도라 같은 초 안에 register/login 등 연속 발급 시 동일 토큰이 나올 수 있다.
+        // 매 발급마다 고유 jti 를 부여해 토큰 자체의 유일성을 보장한다 (RFC 7519 §4.1.7).
         return Jwts.builder()
             .issuer(properties.issuer)
             .subject(userId.toString())
+            .id(UUID.randomUUID().toString())
             .claim("email", email)
             .claim("type", "access")
             .issuedAt(Date.from(now))

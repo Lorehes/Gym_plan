@@ -45,7 +45,7 @@ import java.util.Base64
  * ------------------------------------------------------------------
  * 시나리오 보안 — 로그인 실패 동일 에러 응답 (TC-005, TC-006)
  * ------------------------------------------------------------------
- * STEP-7. 잘못된 비밀번호 → 401 AUTH_INVALID_CREDENTIALS + "이메일 또는 비밀번호가 올바르지 않습니다"
+ * STEP-7. 잘못된 비밀번호 → 401 AUTH_INVALID_CREDENTIALS + "이메일 또는 비밀번호가 올바르지 않습니다."
  * STEP-8. 존재하지 않는 이메일 → 동일 코드·메시지 (계정 존재 여부 노출 금지)
  *
  * ------------------------------------------------------------------
@@ -218,7 +218,7 @@ class UserAuthE2EFlowTest
         registerUser(email)
 
         val expectedCode = "AUTH_INVALID_CREDENTIALS"
-        val expectedMessage = "이메일 또는 비밀번호가 올바르지 않습니다"
+        val expectedMessage = "이메일 또는 비밀번호가 올바르지 않습니다."
 
         // TC-005: 잘못된 비밀번호 (계정 존재 O)
         mockMvc.perform(
