@@ -45,7 +45,7 @@ describe('workoutStore', () => {
   describe('세션 상태 관리', () => {
     it('start: plan으로 운동 목록을 초기화하고 currentIndex=0', () => {
       useWorkoutStore.getState().start(
-        { sessionId: 'S1', startedAt: 'now', planId: 100, planName: 'Push' },
+        { sessionId: 'S1', startedAt: 'now', planId: '100', planName: 'Push' },
         planA,
       );
       const s = useWorkoutStore.getState();
@@ -57,7 +57,7 @@ describe('workoutStore', () => {
 
     it('reset: 모든 세션 상태 초기화', () => {
       useWorkoutStore.getState().start(
-        { sessionId: 'S1', startedAt: 'now', planId: 100, planName: 'Push' },
+        { sessionId: 'S1', startedAt: 'now', planId: '100', planName: 'Push' },
         planA,
       );
       useWorkoutStore.getState().reset();
@@ -70,7 +70,7 @@ describe('workoutStore', () => {
   describe('세트 추가/수정/삭제', () => {
     beforeEach(() => {
       useWorkoutStore.getState().start(
-        { sessionId: 'S1', startedAt: 'now', planId: 100, planName: 'Push' },
+        { sessionId: 'S1', startedAt: 'now', planId: '100', planName: 'Push' },
         planA,
       );
     });
@@ -122,7 +122,7 @@ describe('workoutStore', () => {
   describe('completed state 분기', () => {
     beforeEach(() => {
       useWorkoutStore.getState().start(
-        { sessionId: 'S1', startedAt: 'now', planId: 100, planName: 'Push' },
+        { sessionId: 'S1', startedAt: 'now', planId: '100', planName: 'Push' },
         planA,
       );
     });
@@ -161,19 +161,29 @@ describe('workoutStore', () => {
   describe('recoverFromActive', () => {
     const active: ActiveSession = {
       sessionId: 'S2',
-      startedAt: 'now',
-      planId: 100,
+      planId: '100',
       planName: 'Push',
+      startedAt: 'now',
+      completedAt: null,
       status: 'IN_PROGRESS',
-      sets: [
+      totalVolume: 0,
+      totalSets: 0,
+      durationSec: 0,
+      notes: null,
+      exercises: [
         {
           exerciseId: '11',
           exerciseName: 'Bench',
           muscleGroup: 'CHEST',
-          setNo: 1,
-          reps: 10,
-          weightKg: 60,
-          isSuccess: true,
+          sets: [
+            {
+              setNo: 1,
+              reps: 10,
+              weightKg: 60,
+              isSuccess: true,
+              completedAt: '2026-04-28T10:00:00Z',
+            },
+          ],
         },
       ],
     };

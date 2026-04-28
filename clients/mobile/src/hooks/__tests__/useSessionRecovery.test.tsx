@@ -48,11 +48,16 @@ const planSame: TodayPlan = {
 
 const activeMatching: ActiveSession = {
   sessionId: 'S100',
-  startedAt: '2026-04-28T10:00:00Z',
-  planId: 200,
+  planId: '200',
   planName: 'Pull',
+  startedAt: '2026-04-28T10:00:00Z',
+  completedAt: null,
   status: 'IN_PROGRESS',
-  sets: [],
+  totalVolume: 0,
+  totalSets: 0,
+  durationSec: 0,
+  notes: null,
+  exercises: [],
 };
 
 beforeEach(() => {
@@ -102,15 +107,20 @@ describe('useSessionRecovery', () => {
     const planChanged: TodayPlan = { ...planSame, planId: 999 };
     const activeWithSets: ActiveSession = {
       ...activeMatching,
-      sets: [
+      exercises: [
         {
           exerciseId: '21',
           exerciseName: 'Row',
           muscleGroup: 'BACK',
-          setNo: 1,
-          reps: 10,
-          weightKg: 50,
-          isSuccess: true,
+          sets: [
+            {
+              setNo: 1,
+              reps: 10,
+              weightKg: 50,
+              isSuccess: true,
+              completedAt: '2026-04-28T10:05:00Z',
+            },
+          ],
         },
       ],
     };
@@ -130,7 +140,7 @@ describe('useSessionRecovery', () => {
 
   it('이미 로컬 세션이 있으면 복구하지 않음 (사용자 진행 중 보호)', async () => {
     useWorkoutStore.getState().start(
-      { sessionId: 'LOCAL', startedAt: 'now', planId: 200, planName: 'Pull' },
+      { sessionId: 'LOCAL', startedAt: 'now', planId: '200', planName: 'Pull' },
       planSame,
     );
     mockActive.mockReturnValue({ data: activeMatching, isPending: false });

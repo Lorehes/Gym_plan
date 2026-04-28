@@ -2,8 +2,7 @@ import { create } from 'zustand';
 
 import type { PlanExercise, TodayPlan } from '@/api/plan';
 import type { PersonalRecord } from '@/api/analytics';
-import type { ActiveSession, ActiveSetEntry } from '@/api/workout';
-import type { MuscleGroup } from '@/components/Badge';
+import type { ActiveExercise, ActiveSession } from '@/api/workout';
 
 import type { ExerciseProgress, LocalSetLog, SetLogStatus } from './types';
 
@@ -14,7 +13,8 @@ import type { ExerciseProgress, LocalSetLog, SetLogStatus } from './types';
 interface ActiveSessionMeta {
   sessionId: string;
   startedAt: string;
-  planId: number | null;
+  // 백엔드는 String 으로 직렬화. plan.planId(number) 와 비교 시 변환 필요.
+  planId: string | null;
   planName: string | null;
 }
 
@@ -30,7 +30,7 @@ interface WorkoutState {
   start: (session: ActiveSessionMeta, plan: TodayPlan) => void;
 
   // 앱 진입 시 진행 중 세션 복구. plan이 active.planId와 일치하면 plan 기반으로
-  // 풀 정보 복구, 일치하지 않으면 active.sets에서 운동 구조를 추론.
+  // 풀 정보 복구, 일치하지 않으면 active.exercises 에서 운동 구조를 추론.
   recoverFromActive: (active: ActiveSession, plan: TodayPlan | null) => void;
 
   setPRSnapshot: (snapshot: PersonalRecord[]) => void;
@@ -51,58 +51,29 @@ interface WorkoutState {
   reset: () => void;
 }
 
-// active.sets에서 운동 골격 추론 — plan 정보 없이 복구해야 할 때만 사용.
-// targetSets는 알 수 없어 기록된 setNo의 최댓값으로 대체. 최소 1.
-// targetReps/Weight/restSeconds는 합리적 기본값 — 사용자가 운동 중 탭으로 정정 가능.
-function reconstructFromSets(sets: ActiveSetEntry[]): ExerciseProgress[] {
-  const seen = new Map<
-    string,
-    {
-      exerciseId: number;
-      exerciseName: string;
-      muscleGroup: MuscleGroup;
-      maxSetNo: number;
-      latestReps: number;
-      latestWeightKg: number;
-      firstAppearance: number; // 입력 순서 보존용.
-    }
-  >();
-  let order = 0;
-  for (const s of sets) {
-    const existing = seen.get(s.exerciseId);
-    if (existing) {
-      if (s.setNo > existing.maxSetNo) {
-        existing.maxSetNo = s.setNo;
-        existing.latestReps = s.reps;
-        existing.latestWeightKg = s.weightKg;
-      }
-    } else {
-      seen.set(s.exerciseId, {
-        exerciseId: Number.parseInt(s.exerciseId, 10),
-        exerciseName: s.exerciseName,
-        muscleGroup: s.muscleGroup,
-        maxSetNo: s.setNo,
-        latestReps: s.reps,
-        latestWeightKg: s.weightKg,
-        firstAppearance: order++,
-      });
-    }
-  }
-
-  return Array.from(seen.values())
-    .sort((a, b) => a.firstAppearance - b.firstAppearance)
-    .map<ExerciseProgress>((e) => ({
-      exerciseId: e.exerciseId,
-      exerciseName: e.exerciseName,
-      muscleGroup: e.muscleGroup,
-      targetSets: Math.max(1, e.maxSetNo),
-      targetReps: e.latestReps,
-      targetWeightKg: e.latestWeightKg,
+// active.exercises 에서 운동 골격 추론 — plan 정보 없이 복구해야 할 때만 사용.
+// targetSets 는 알 수 없어 기록된 sets 의 최대 setNo 로 대체 (최소 1).
+// targetReps/Weight/restSeconds 는 합리적 기본값 — 사용자가 운동 중 탭으로 정정 가능.
+function reconstructFromExercises(exercises: ActiveExercise[]): ExerciseProgress[] {
+  return exercises.map<ExerciseProgress>((ex) => {
+    const sortedSets = ex.sets.slice().sort((a, b) => a.setNo - b.setNo);
+    const last = sortedSets[sortedSets.length - 1];
+    const latestReps = last?.reps ?? 0;
+    const latestWeightKg = last?.weightKg ?? 0;
+    const maxSetNo = last?.setNo ?? 0;
+    return {
+      exerciseId: Number.parseInt(ex.exerciseId, 10),
+      exerciseName: ex.exerciseName,
+      muscleGroup: ex.muscleGroup,
+      targetSets: Math.max(1, maxSetNo),
+      targetReps: latestReps,
+      targetWeightKg: latestWeightKg,
       restSeconds: 90,
-      currentReps: e.latestReps,
-      currentWeightKg: e.latestWeightKg,
+      currentReps: latestReps,
+      currentWeightKg: latestWeightKg,
       completedSets: [],
-    }));
+    };
+  });
 }
 
 function planExerciseToProgress(e: PlanExercise): ExerciseProgress {
@@ -139,26 +110,27 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   },
 
   recoverFromActive: (active, plan) => {
-    const planMatches = plan != null && plan.planId === active.planId;
+    // 백엔드 planId 는 String 직렬화. plan.planId(number) 와 비교 시 변환 필요.
+    const activePlanIdNum =
+      active.planId !== null ? Number.parseInt(active.planId, 10) : null;
+    const planMatches =
+      plan != null && activePlanIdNum !== null && plan.planId === activePlanIdNum;
 
-    // 운동 골격: plan과 active.planId 일치 시 plan 사용, 아니면 sets에서 추론.
+    // 운동 골격: plan과 active.planId 일치 시 plan 사용, 아니면 exercises 에서 추론.
     const baseExercises: ExerciseProgress[] = planMatches
       ? plan.exercises
           .slice()
           .sort((a, b) => a.orderIndex - b.orderIndex)
           .map(planExerciseToProgress)
-      : reconstructFromSets(active.sets);
+      : reconstructFromExercises(active.exercises);
 
-    // active.sets를 exerciseId 기준으로 그룹핑 후 각 운동의 completedSets에 주입.
-    const setsByExId = new Map<string, ActiveSetEntry[]>();
-    for (const s of active.sets) {
-      const list = setsByExId.get(s.exerciseId) ?? [];
-      list.push(s);
-      setsByExId.set(s.exerciseId, list);
-    }
+    // active.exercises 를 exerciseId 기준으로 매핑 후 각 운동의 completedSets 에 주입.
+    const exById = new Map<string, ActiveExercise>();
+    for (const ex of active.exercises) exById.set(ex.exerciseId, ex);
 
     const recoveredExercises: ExerciseProgress[] = baseExercises.map((ex) => {
-      const matchingSets = (setsByExId.get(String(ex.exerciseId)) ?? [])
+      const matched = exById.get(String(ex.exerciseId));
+      const matchingSets = (matched?.sets ?? [])
         .slice()
         .sort((a, b) => a.setNo - b.setNo);
 

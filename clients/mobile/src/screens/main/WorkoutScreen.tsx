@@ -77,7 +77,8 @@ export function WorkoutScreen({ navigation }: MainTabScreenProps<'Workout'>) {
         {
           sessionId: data.sessionId,
           startedAt: data.startedAt,
-          planId: plan.planId,
+          // 백엔드 SessionDetailResponse.planId 와 동일하게 String 으로 보존.
+          planId: String(plan.planId),
           planName: plan.name,
         },
         plan,

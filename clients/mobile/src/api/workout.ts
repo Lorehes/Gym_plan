@@ -31,23 +31,38 @@ export interface SessionComplete {
   totalSets: number;
 }
 
+// 백엔드 SessionDetailResponse.exercises[].sets[] 와 1:1 대응.
+// completedAt 은 mobile 에서 표시에 사용하지 않지만 스키마 보존.
 export interface ActiveSetEntry {
-  exerciseId: string;
-  exerciseName: string;
-  muscleGroup: MuscleGroup;
   setNo: number;
   reps: number;
   weightKg: number;
   isSuccess: boolean;
+  completedAt: string;
 }
 
+export interface ActiveExercise {
+  exerciseId: string;
+  exerciseName: string;
+  muscleGroup: MuscleGroup;
+  sets: ActiveSetEntry[];
+}
+
+// 백엔드 SessionDetailResponse 와 1:1 대응 (workout-service SessionResponses.kt).
+// planId 는 백엔드가 String 으로 직렬화 — TodayPlan.planId(number) 와 비교 시 변환 필요.
+// status 는 활성 세션 조회이므로 IN_PROGRESS 만 도착 (completedAt IS NULL 조건).
 export interface ActiveSession {
   sessionId: string;
-  startedAt: string;
-  planId: number | null;
+  planId: string | null;
   planName: string | null;
+  startedAt: string;
+  completedAt: string | null;
   status: 'IN_PROGRESS';
-  sets: ActiveSetEntry[];
+  totalVolume: number;
+  totalSets: number;
+  durationSec: number;
+  notes: string | null;
+  exercises: ActiveExercise[];
 }
 
 export async function startSession(body: SessionStartRequest): Promise<SessionStart> {

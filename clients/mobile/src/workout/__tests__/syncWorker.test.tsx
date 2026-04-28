@@ -71,7 +71,7 @@ beforeEach(() => {
 describe('useSyncWorker', () => {
   it('성공 drain → workoutStore의 pending이 logged로 전이', async () => {
     useWorkoutStore.getState().start(
-      { sessionId: 'CUR', startedAt: 'now', planId: 200, planName: 'Push' },
+      { sessionId: 'CUR', startedAt: 'now', planId: '200', planName: 'Push' },
       plan,
     );
     const r = useWorkoutStore.getState().appendPendingSet();
@@ -91,7 +91,7 @@ describe('useSyncWorker', () => {
 
   it('sessionId 가드: 다른 세션의 success 이벤트는 현재 store에 영향 없음', async () => {
     useWorkoutStore.getState().start(
-      { sessionId: 'CUR', startedAt: 'now', planId: 200, planName: 'Push' },
+      { sessionId: 'CUR', startedAt: 'now', planId: '200', planName: 'Push' },
       plan,
     );
     useWorkoutStore.getState().appendPendingSet();
@@ -111,7 +111,7 @@ describe('useSyncWorker', () => {
 
   it('dead 이벤트 → 현재 세션이면 failed로 전이', async () => {
     useWorkoutStore.getState().start(
-      { sessionId: 'CUR', startedAt: 'now', planId: 200, planName: 'Push' },
+      { sessionId: 'CUR', startedAt: 'now', planId: '200', planName: 'Push' },
       plan,
     );
     useWorkoutStore.getState().appendPendingSet();
@@ -130,7 +130,7 @@ describe('useSyncWorker', () => {
 
   it('백오프 동작: 5xx 실패 후 같은 항목은 즉시 다시 호출되지 않는다', async () => {
     useWorkoutStore.getState().start(
-      { sessionId: 'CUR', startedAt: 'now', planId: 200, planName: 'Push' },
+      { sessionId: 'CUR', startedAt: 'now', planId: '200', planName: 'Push' },
       plan,
     );
     useWorkoutStore.getState().appendPendingSet();
@@ -158,7 +158,7 @@ describe('useSyncWorker', () => {
 
   it('진행 이벤트(progress)는 현재 세션이어도 store status를 변경하지 않는다', async () => {
     useWorkoutStore.getState().start(
-      { sessionId: 'CUR', startedAt: 'now', planId: 200, planName: 'Push' },
+      { sessionId: 'CUR', startedAt: 'now', planId: '200', planName: 'Push' },
       plan,
     );
     useWorkoutStore.getState().appendPendingSet();

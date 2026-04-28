@@ -34,8 +34,11 @@ export function useSessionRecovery() {
       if (planPending) return; // 일치 판정 위해 plan 도착까지 대기.
     }
 
+    // 백엔드 planId 는 String 직렬화 — plan.planId(number) 와 비교하려면 변환.
+    const activePlanIdNum =
+      active.planId !== null ? Number.parseInt(active.planId, 10) : null;
     const planMatches =
-      active.planId !== null && plan != null && plan.planId === active.planId;
+      activePlanIdNum !== null && plan != null && plan.planId === activePlanIdNum;
 
     // plan이 일치하면 그대로, 아니면 sets에서 추론.
     recoverFromActive(active, planMatches ? plan : null);
