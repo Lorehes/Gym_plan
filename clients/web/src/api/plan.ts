@@ -20,7 +20,8 @@ export interface PlanExercise {
   notes: string | null;
 }
 
-// dayOfWeek: Int? (1=월 ~ 7=일, ISO-8601). 미배정 루틴은 null.
+// dayOfWeek: Int? — 백엔드(plan-service PlanRequests.kt) 기준 0=월 ~ 6=일, null=무요일.
+// (docs/api/plan-service.md 예시는 1-based 로 기술돼 있으나 실제 코드 동작은 0-based.)
 export interface PlanSummary {
   planId: number;
   name: string;
@@ -52,6 +53,8 @@ export interface UpdatePlanRequest {
 
 export interface AddPlanExerciseRequest {
   exerciseId: number;
+  exerciseName: string;
+  muscleGroup: string;
   orderIndex: number;
   targetSets: number;
   targetReps: number;

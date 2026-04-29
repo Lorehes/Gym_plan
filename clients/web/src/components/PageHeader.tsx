@@ -6,9 +6,9 @@ interface Props {
 
 export function PageHeader({ title, description, actions }: Props) {
   return (
-    <header className="flex items-end justify-between gap-4 border-b border-neutral-200 px-8 py-6">
+    <header className="flex items-end justify-between gap-4 border-b border-neutral-200 px-4 py-4 md:px-8 md:py-6">
       <div>
-        <h1 className="text-3xl font-bold text-neutral-900">{title}</h1>
+        <h1 className="text-2xl font-bold text-neutral-900 md:text-3xl">{title}</h1>
         {description && (
           <p className="mt-1 text-sm text-neutral-500">{description}</p>
         )}

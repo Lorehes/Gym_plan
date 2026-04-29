@@ -24,6 +24,10 @@ export const equipmentLabel: Record<string, string> = {
   BAND: '밴드',
 };
 
+// 백엔드 기준 (plan-service PlanRequests.kt): 0=월, 1=화, ..., 6=일, null=무요일.
+// 주의: docs/api/plan-service.md 예시와 indexing 이 다르다 — 실제 동작은 0-based.
+export const DAY_OF_WEEK_VALUES = [0, 1, 2, 3, 4, 5, 6] as const;
+
 export const dayOfWeekLabel: Record<number, string> = {
-  1: '월', 2: '화', 3: '수', 4: '목', 5: '금', 6: '토', 7: '일',
+  0: '월', 1: '화', 2: '수', 3: '목', 4: '금', 5: '토', 6: '일',
 };
