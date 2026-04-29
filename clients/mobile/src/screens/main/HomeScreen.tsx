@@ -19,13 +19,14 @@ import { usePlanToday } from '@/queries/usePlanToday';
 import type { TodayPlan, PlanExercise } from '@/api/plan';
 import { colors, radius, spacing, textStyles } from '@/theme';
 
-const WEEKDAY_LABEL = ['', '월', '화', '수', '목', '금', '토', '일'] as const;
+const WEEKDAY_LABEL = ['월', '화', '수', '목', '금', '토', '일'] as const;
 
 function todayLabel(): { dayOfWeek: number; label: string } {
-  // ISO 8601: 1=Mon ... 7=Sun (서버와 동일)
-  const jsDay = new Date().getDay(); // 0=Sun..6=Sat
-  const isoDay = jsDay === 0 ? 7 : jsDay;
-  return { dayOfWeek: isoDay, label: WEEKDAY_LABEL[isoDay] ?? '' };
+  // 서버 기준 0-based: 0=월, 1=화, ..., 6=일
+  // JS getDay(): 0=Sun..6=Sat → (jsDay + 6) % 7 으로 변환
+  const jsDay = new Date().getDay();
+  const dow = (jsDay + 6) % 7;
+  return { dayOfWeek: dow, label: WEEKDAY_LABEL[dow] ?? '' };
 }
 
 function uniqueMuscleGroups(exercises: PlanExercise[]): MuscleGroup[] {

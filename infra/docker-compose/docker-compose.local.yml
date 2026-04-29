@@ -32,6 +32,7 @@ services:
       - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
       # 비밀번호 없이 ping (mysqladmin ping 은 인증 없이도 포트 응답만 확인하면 OK)
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -81,7 +82,10 @@ services:
 
   # ───── Elasticsearch: 운동 종목 검색 (nori), 통계 집계 ─────
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    build:
+      context: ./elasticsearch
+      dockerfile: Dockerfile
+    image: gymplan-elasticsearch:local
     container_name: gymplan-elasticsearch
     restart: unless-stopped
     environment:

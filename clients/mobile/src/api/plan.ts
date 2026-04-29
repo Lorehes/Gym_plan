@@ -20,7 +20,7 @@ export interface PlanExercise {
 }
 
 // dayOfWeek 는 Int? — /plans/today 응답은 사실상 오늘 요일(non-null)이지만
-// 백엔드 직렬화 계약을 따름. 1 (Mon) ~ 7 (Sun), ISO 8601.
+// 백엔드 직렬화 계약을 따름. 0=월, 1=화, ..., 6=일 (0-based, 서버와 동일).
 export interface TodayPlan {
   planId: number;
   name: string;
