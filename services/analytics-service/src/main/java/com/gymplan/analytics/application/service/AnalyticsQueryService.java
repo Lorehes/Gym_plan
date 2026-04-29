@@ -55,12 +55,12 @@ public class AnalyticsQueryService {
 
         NativeQuery query = NativeQuery.builder()
                 .withQuery(q -> q.bool(b -> b.filter(List.of(
-                        Query.of(f -> f.term(t -> t.field("userId").value(userId))),
+                        Query.of(f -> f.term(t -> t.field("userId.keyword").value(userId))),
                         Query.of(r -> r.range(rq -> rq.field("completedAt")
                                 .gte(JsonData.of(from)).lte(JsonData.of("now/d"))))
                 ))))
                 .withAggregation("total_sessions",
-                        Aggregation.of(a -> a.valueCount(vc -> vc.field("sessionId"))))
+                        Aggregation.of(a -> a.valueCount(vc -> vc.field("sessionId.keyword"))))
                 .withAggregation("total_volume",
                         Aggregation.of(a -> a.sum(s -> s.field("totalVolume"))))
                 .withAggregation("total_duration",
@@ -68,7 +68,7 @@ public class AnalyticsQueryService {
                 .withAggregation("avg_duration",
                         Aggregation.of(a -> a.avg(av -> av.field("durationSec"))))
                 .withAggregation("top_muscle",
-                        Aggregation.of(a -> a.terms(t -> t.field("muscleGroups").size(1))))
+                        Aggregation.of(a -> a.terms(t -> t.field("muscleGroups.keyword").size(1))))
                 .withMaxResults(0)
                 .build();
 
@@ -97,11 +97,11 @@ public class AnalyticsQueryService {
         String from = period.toEsDateMath();
 
         List<Query> filters = new ArrayList<>();
-        filters.add(Query.of(f -> f.term(t -> t.field("userId").value(userId))));
+        filters.add(Query.of(f -> f.term(t -> t.field("userId.keyword").value(userId))));
         filters.add(Query.of(r -> r.range(rq -> rq.field("occurredAt")
                 .gte(JsonData.of(from)).lte(JsonData.of("now/d")))));
         if (muscle != null && !muscle.isBlank()) {
-            filters.add(Query.of(f -> f.term(t -> t.field("muscleGroup").value(muscle))));
+            filters.add(Query.of(f -> f.term(t -> t.field("muscleGroup.keyword").value(muscle))));
         }
 
         NativeQuery query = NativeQuery.builder()
@@ -113,7 +113,7 @@ public class AnalyticsQueryService {
                                 .format("yyyy-MM-dd"))
                         .aggregations("daily_volume", Aggregation.of(sub -> sub.sum(s -> s.field("volume"))))
                         .aggregations("muscle_terms", Aggregation.of(sub -> sub
-                                .terms(t -> t.field("muscleGroup").size(10))
+                                .terms(t -> t.field("muscleGroup.keyword").size(10))
                                 .aggregations("per_muscle_volume", Aggregation.of(mv -> mv.sum(s -> s.field("volume"))))))))
                 .withMaxResults(0)
                 .build();
@@ -155,7 +155,7 @@ public class AnalyticsQueryService {
 
         NativeQuery query = NativeQuery.builder()
                 .withQuery(q -> q.bool(b -> b.filter(List.of(
-                        Query.of(f -> f.term(t -> t.field("userId").value(userId))),
+                        Query.of(f -> f.term(t -> t.field("userId.keyword").value(userId))),
                         Query.of(r -> r.range(rq -> rq.field("completedAt")
                                 .gte(JsonData.of(from)).lte(JsonData.of(to))))
                 ))))
@@ -164,7 +164,7 @@ public class AnalyticsQueryService {
                                 .field("completedAt")
                                 .calendarInterval(CalendarInterval.Day)
                                 .format("yyyy-MM-dd"))
-                        .aggregations("session_count", Aggregation.of(sub -> sub.valueCount(vc -> vc.field("sessionId"))))
+                        .aggregations("session_count", Aggregation.of(sub -> sub.valueCount(vc -> vc.field("sessionId.keyword"))))
                         .aggregations("daily_volume", Aggregation.of(sub -> sub.sum(s -> s.field("totalVolume"))))))
                 .withMaxResults(0)
                 .build();
@@ -191,7 +191,7 @@ public class AnalyticsQueryService {
 
     public List<PersonalRecordResponse> getPersonalRecords(String userId) {
         NativeQuery query = NativeQuery.builder()
-                .withQuery(q -> q.term(t -> t.field("userId").value(userId)))
+                .withQuery(q -> q.term(t -> t.field("userId.keyword").value(userId)))
                 .withSort(Sort.by(Sort.Direction.DESC, "estimated1RM"))
                 .withMaxResults(20)
                 .build();
