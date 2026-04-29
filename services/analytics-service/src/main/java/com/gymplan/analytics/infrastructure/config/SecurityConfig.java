@@ -6,18 +6,14 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.List;
 
 /**
- * Spring Security 설정.
+ * analytics-service Spring Security 설정.
  *
  * JWT 검증은 Gateway에서 처리됨 → 이 서비스는 Spring Security 필터를 최소화.
- * userId는 CurrentUserIdArgumentResolver가 X-User-Id 헤더에서 추출 (docs/context/security-guide.md).
+ * CORS 는 Gateway 단독 책임 — 하위 서비스에서 헤더를 중복 발급하지 않는다.
+ *
+ * 보안 가이드: docs/context/security-guide.md
  */
 @Configuration
 public class SecurityConfig {
@@ -26,7 +22,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .cors(cors -> cors.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable())
@@ -36,23 +32,5 @@ public class SecurityConfig {
                         .anyRequest().permitAll()
                 );
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        var config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "https://gymplan.io",
-                "capacitor://localhost"
-        ));
-        config.setAllowedMethods(List.of("GET", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
-
-        var source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
     }
 }

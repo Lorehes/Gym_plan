@@ -6,16 +6,12 @@ import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.web.cors.CorsConfiguration
-import org.springframework.web.cors.CorsConfigurationSource
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 /**
  * notification-service 보안 설정.
  *
  * Gateway가 JWT 검증 후 X-User-Id 헤더를 주입.
- * 본 서비스는 X-User-Id 헤더를 신뢰 (JWT 직접 검증 금지).
- * 인증 강제는 CurrentUserIdArgumentResolver에서 수행.
+ * CORS 는 Gateway 단독 책임 — 하위 서비스에서 헤더를 중복 발급하지 않는다.
  */
 @Configuration
 class SecurityConfig {
@@ -23,7 +19,7 @@ class SecurityConfig {
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
         http
             .csrf { it.disable() }
-            .cors { it.configurationSource(corsConfigurationSource()) }
+            .cors { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
@@ -34,29 +30,5 @@ class SecurityConfig {
                     .anyRequest().permitAll()
             }
         return http.build()
-    }
-
-    @Bean
-    fun corsConfigurationSource(): CorsConfigurationSource {
-        val config =
-            CorsConfiguration().apply {
-                allowedOrigins =
-                    listOf(
-                        "http://localhost:3000",
-                        "https://gymplan.io",
-                        "capacitor://localhost",
-                    )
-                allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "X-Requested-With")
-                allowCredentials = true
-                maxAge = MAX_AGE_SECONDS
-            }
-        return UrlBasedCorsConfigurationSource().apply {
-            registerCorsConfiguration("/**", config)
-        }
-    }
-
-    companion object {
-        private const val MAX_AGE_SECONDS = 3600L
     }
 }
