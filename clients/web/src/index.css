@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-neutral-50 text-neutral-900 antialiased;
+    font-family:
+      'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+      system-ui, sans-serif;
+    font-feature-settings: 'tnum';
+  }
+
+  /* docs/design/typography.md 웹 본문 행간 1.6 */
+  p { line-height: 1.6; }
+}
+
+@layer components {
+  /* 웹은 정보 밀도 우선 — 카드는 얇은 테두리 + 작은 패딩. */
+  .card {
+    @apply bg-white border border-neutral-200 rounded-lg shadow-sm;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2
+           text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  }
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-600;
+  }
+  .btn-accent {
+    @apply btn bg-accent-500 text-white hover:bg-accent-600 focus-visible:ring-accent-500;
+  }
+  .btn-ghost {
+    @apply btn text-neutral-700 hover:bg-neutral-100 focus-visible:ring-neutral-300;
+  }
+  .btn-danger {
+    @apply btn bg-error-500 text-white hover:bg-red-600 focus-visible:ring-error-500;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm
+           placeholder:text-neutral-400
+           focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500;
+  }
+  .label {
+    @apply block text-sm font-medium text-neutral-700 mb-1;
+  }
+}
