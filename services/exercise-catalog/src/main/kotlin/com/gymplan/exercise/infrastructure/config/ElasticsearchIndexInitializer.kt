@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component
 class ElasticsearchIndexInitializer(
     private val elasticsearchOperations: ElasticsearchOperations,
 ) : ApplicationRunner {
-
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun run(args: ApplicationArguments) {

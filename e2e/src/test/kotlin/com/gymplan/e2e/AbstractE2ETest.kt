@@ -32,14 +32,13 @@ import java.util.concurrent.atomic.AtomicLong
  */
 @Tag("e2e")
 abstract class AbstractE2ETest {
-
     companion object {
         /** E2E 환경 초기화 (compose start) 는 최초 1회만. */
         @JvmStatic
         @BeforeAll
         fun configureRestAssured() {
             RestAssured.baseURI = "http://${E2EStack.gatewayHost}"
-            RestAssured.port   = E2EStack.gatewayPort
+            RestAssured.port = E2EStack.gatewayPort
             RestAssured.enableLoggingOfRequestAndResponseIfValidationFails()
         }
 
@@ -50,26 +49,28 @@ abstract class AbstractE2ETest {
         /** 유니크한 이메일을 가진 사용자를 등록하고 accessToken 을 반환한다. */
         fun registerUser(nickname: String = "e2eUser"): RegisteredUser {
             val seq = userSeq.incrementAndGet()
-            val email = "e2e_${seq}@gymplan.test"
+            val email = "e2e_$seq@gymplan.test"
             val password = "E2ePass1!"
 
-            val body = mapOf(
-                "email"    to email,
-                "password" to password,
-                "nickname" to nickname,
-            )
+            val body =
+                mapOf(
+                    "email" to email,
+                    "password" to password,
+                    "nickname" to nickname,
+                )
 
-            val response: Response = RestAssured
-                .given()
-                .contentType(ContentType.JSON)
-                .body(body)
-                .post("/api/v1/auth/register")
-                .then()
-                .statusCode(201)
-                .extract().response()
+            val response: Response =
+                RestAssured
+                    .given()
+                    .contentType(ContentType.JSON)
+                    .body(body)
+                    .post("/api/v1/auth/register")
+                    .then()
+                    .statusCode(201)
+                    .extract().response()
 
             val accessToken = response.jsonPath().getString("data.accessToken")
-            val userId      = response.jsonPath().getLong("data.userId")
+            val userId = response.jsonPath().getLong("data.userId")
             return RegisteredUser(userId, email, password, accessToken)
         }
 
@@ -89,12 +90,16 @@ abstract class AbstractE2ETest {
                 .dayOfWeek.value - 1
 
         /** dayOfWeek=오늘로 루틴을 생성하고 planId 를 반환한다. */
-        fun createPlanForToday(accessToken: String, name: String): Long {
-            val body = mapOf(
-                "name"        to name,
-                "description" to "E2E auto-created",
-                "dayOfWeek"   to todayDayOfWeekKst(),
-            )
+        fun createPlanForToday(
+            accessToken: String,
+            name: String,
+        ): Long {
+            val body =
+                mapOf(
+                    "name" to name,
+                    "description" to "E2E auto-created",
+                    "dayOfWeek" to todayDayOfWeekKst(),
+                )
             return RestAssured.given()
                 .contentType(ContentType.JSON)
                 .header("Authorization", "Bearer $accessToken")
@@ -105,16 +110,21 @@ abstract class AbstractE2ETest {
         }
 
         /** 루틴에 운동 항목 1개를 추가한다 (벤치프레스 가정값). */
-        fun addBenchExercise(accessToken: String, planId: Long): Long {
-            val body = mapOf(
-                "exerciseId"     to 1,             // catalog 미연동, 비정규화 저장
-                "exerciseName"   to "벤치프레스",
-                "muscleGroup"    to "CHEST",
-                "targetSets"     to 4,
-                "targetReps"     to 10,
-                "targetWeightKg" to 70.0,
-                "restSeconds"    to 90,
-            )
+        fun addBenchExercise(
+            accessToken: String,
+            planId: Long,
+        ): Long {
+            val body =
+                mapOf(
+                    // catalog 미연동, 비정규화 저장
+                    "exerciseId" to 1,
+                    "exerciseName" to "벤치프레스",
+                    "muscleGroup" to "CHEST",
+                    "targetSets" to 4,
+                    "targetReps" to 10,
+                    "targetWeightKg" to 70.0,
+                    "restSeconds" to 90,
+                )
             return RestAssured.given()
                 .contentType(ContentType.JSON)
                 .header("Authorization", "Bearer $accessToken")
@@ -132,12 +142,13 @@ abstract class AbstractE2ETest {
             equipment: String = "BARBELL",
             difficulty: String = "INTERMEDIATE",
         ): Long {
-            val body = mapOf(
-                "name"        to name,
-                "muscleGroup" to muscleGroup,
-                "equipment"   to equipment,
-                "difficulty"  to difficulty,
-            )
+            val body =
+                mapOf(
+                    "name" to name,
+                    "muscleGroup" to muscleGroup,
+                    "equipment" to equipment,
+                    "difficulty" to difficulty,
+                )
             return RestAssured.given()
                 .contentType(ContentType.JSON)
                 .header("Authorization", "Bearer $accessToken")
@@ -154,23 +165,23 @@ abstract class AbstractE2ETest {
 // 여러 테스트 클래스에서 중복 실행되지 않음을 보장한다.
 // ────────────────────────────────────────────────────────────────────────────
 internal object E2EStack {
-
     // RSA 2048 키 쌍 생성
-    private val keyPair: KeyPair = KeyPairGenerator.getInstance("RSA")
-        .also { it.initialize(2048) }
-        .generateKeyPair()
+    private val keyPair: KeyPair =
+        KeyPairGenerator.getInstance("RSA")
+            .also { it.initialize(2048) }
+            .generateKeyPair()
 
     /** PKCS#8 DER → single-line PEM (헤더/푸터 포함, 개행 없음) */
     private val privateKeyPem: String =
         "-----BEGIN PRIVATE KEY-----" +
-        Base64.getEncoder().encodeToString(keyPair.private.encoded) +
-        "-----END PRIVATE KEY-----"
+            Base64.getEncoder().encodeToString(keyPair.private.encoded) +
+            "-----END PRIVATE KEY-----"
 
     /** SubjectPublicKeyInfo DER → single-line PEM */
     val publicKeyPem: String =
         "-----BEGIN PUBLIC KEY-----" +
-        Base64.getEncoder().encodeToString(keyPair.public.encoded) +
-        "-----END PUBLIC KEY-----"
+            Base64.getEncoder().encodeToString(keyPair.public.encoded) +
+            "-----END PUBLIC KEY-----"
 
     // ── Docker Compose 컨테이너 ───────────────────────────────────────────
 
@@ -178,7 +189,7 @@ internal object E2EStack {
         File("../infra/docker-compose/docker-compose.e2e.yml").also {
             check(it.exists()) {
                 "E2E compose 파일을 찾을 수 없습니다: ${it.absolutePath}" +
-                " — e2e 모듈 루트에서 실행 중인지 확인하세요."
+                    " — e2e 모듈 루트에서 실행 중인지 확인하세요."
             }
         }
 
@@ -187,13 +198,13 @@ internal object E2EStack {
             withLocalCompose(true)
             // 테스트용 RSA 키 주입 (single-line PEM)
             withEnv("JWT_PRIVATE_KEY", privateKeyPem)
-            withEnv("JWT_PUBLIC_KEY",  publicKeyPem)
+            withEnv("JWT_PUBLIC_KEY", publicKeyPem)
             // 인프라 크레덴셜 (테스트 전용 고정값)
             withEnv("MYSQL_ROOT_PASSWORD", "e2eroot")
-            withEnv("MYSQL_DATABASE",      "gymplan_user")
-            withEnv("MYSQL_USER",          "gymplan")
-            withEnv("MYSQL_PASSWORD",      "e2epw")
-            withEnv("REDIS_PASSWORD",      "e2eredis")
+            withEnv("MYSQL_DATABASE", "gymplan_user")
+            withEnv("MYSQL_USER", "gymplan")
+            withEnv("MYSQL_PASSWORD", "e2epw")
+            withEnv("REDIS_PASSWORD", "e2eredis")
         }
 
     // docker-compose.e2e.yml 이 8080:8080 고정 포트로 노출하므로 localhost:8080 직접 사용
@@ -210,10 +221,10 @@ internal object E2EStack {
         // exercise-catalog 는 api-gateway 보다 늦게 뜰 수 있으므로 별도 폴링
         // port 8083 은 docker-compose.e2e.yml 에서 호스트로 직접 노출됨
         waitForDownstream(
-            url          = "http://localhost:$exerciseCatalogPort/actuator/health",
+            url = "http://localhost:$exerciseCatalogPort/actuator/health",
             expectedCode = 200,
-            timeoutMs    = 120_000L,
-            label        = "exercise-catalog",
+            timeoutMs = 120_000L,
+            label = "exercise-catalog",
         )
     }
 
@@ -230,8 +241,8 @@ internal object E2EStack {
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
                 conn.connectTimeout = 2_000
-                conn.readTimeout    = 2_000
-                conn.requestMethod  = "GET"
+                conn.readTimeout = 2_000
+                conn.requestMethod = "GET"
                 val code = conn.responseCode
                 conn.disconnect()
                 if (code == 200) return
@@ -263,12 +274,13 @@ internal object E2EStack {
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
                 conn.connectTimeout = 2_000
-                conn.readTimeout    = 2_000
-                conn.requestMethod  = "GET"
+                conn.readTimeout = 2_000
+                conn.requestMethod = "GET"
                 lastCode = conn.responseCode
                 conn.disconnect()
                 if (lastCode == expectedCode) return
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
             Thread.sleep(3_000)
         }
         throw IllegalStateException(

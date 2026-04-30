@@ -23,12 +23,10 @@ data class ApiResponse<T>(
 ) {
     companion object {
         /** 성공 응답 (데이터 포함) */
-        fun <T> success(data: T): ApiResponse<T> =
-            ApiResponse(success = true, data = data)
+        fun <T> success(data: T): ApiResponse<T> = ApiResponse(success = true, data = data)
 
         /** 성공 응답 (데이터 없음 — 삭제, 204 등) */
-        fun success(): ApiResponse<Unit> =
-            ApiResponse(success = true, data = Unit)
+        fun success(): ApiResponse<Unit> = ApiResponse(success = true, data = Unit)
 
         /** 실패 응답 */
         fun <T> failure(

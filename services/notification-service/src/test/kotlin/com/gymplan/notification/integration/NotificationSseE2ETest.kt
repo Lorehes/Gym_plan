@@ -47,14 +47,15 @@ import java.util.concurrent.TimeUnit
 )
 @TestPropertySource(properties = ["fcm.service-account-path=/dev/null"])
 class NotificationSseE2ETest : AbstractNotificationIntegrationTest() {
-
     // Firebase 초기화(FcmConfig) 및 실제 FCM 발송 방지
     @MockBean lateinit var fcmConfig: FcmConfig
+
     @MockBean lateinit var fcmService: FcmService
 
     @LocalServerPort var port: Int = 0
 
     @Autowired lateinit var redisTemplate: StringRedisTemplate
+
     @Autowired lateinit var objectMapper: ObjectMapper
 
     // ──────────────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ class NotificationSseE2ETest : AbstractNotificationIntegrationTest() {
     @Test
     @DisplayName(
         "E2E-C: SSE 구독 후 Redis PUBLISH → timer-start 이벤트 수신 (1초 이내)" +
-            " → restSeconds 경과 후 timer-end 이벤트 수신"
+            " → restSeconds 경과 후 timer-end 이벤트 수신",
     )
     fun `E2E-C SSE 타이머 전체 흐름 검증`() {
         val sessionId = "e2e-sse-${System.nanoTime()}"
@@ -75,29 +76,31 @@ class NotificationSseE2ETest : AbstractNotificationIntegrationTest() {
         val receivedEvents = CopyOnWriteArrayList<SseEvent>()
 
         // ── SSE 구독 스레드 시작 ──
-        val sseThread = Thread {
-            try {
-                val conn = openSseConnection(sessionId, userId = 1L)
-                BufferedReader(InputStreamReader(conn.inputStream)).use { reader ->
-                    parseSseStream(reader, receivedEvents, timerStartLatch, timerEndLatch)
+        val sseThread =
+            Thread {
+                try {
+                    val conn = openSseConnection(sessionId, userId = 1L)
+                    BufferedReader(InputStreamReader(conn.inputStream)).use { reader ->
+                        parseSseStream(reader, receivedEvents, timerStartLatch, timerEndLatch)
+                    }
+                } catch (e: Exception) {
+                    if (!Thread.currentThread().isInterrupted) {
+                        // timer-end 수신 후 연결이 끊기는 경우는 정상 흐름
+                    }
                 }
-            } catch (e: Exception) {
-                if (!Thread.currentThread().isInterrupted) {
-                    // timer-end 수신 후 연결이 끊기는 경우는 정상 흐름
-                }
+            }.also {
+                it.isDaemon = true
+                it.start()
             }
-        }.also {
-            it.isDaemon = true
-            it.start()
-        }
 
         // SSE 연결 수립 대기 (500ms)
         Thread.sleep(500)
 
         // ── Redis PUBLISH: workout-service가 세트 완료 후 발행하는 메시지 ──
-        val timerMessage = objectMapper.writeValueAsString(
-            mapOf("restSeconds" to restSeconds, "exerciseName" to "벤치프레스")
-        )
+        val timerMessage =
+            objectMapper.writeValueAsString(
+                mapOf("restSeconds" to restSeconds, "exerciseName" to "벤치프레스"),
+            )
         redisTemplate.convertAndSend("timer:$sessionId", timerMessage)
 
         // ── timer-start 이벤트 수신 검증 (2초 이내) ──
@@ -131,13 +134,14 @@ class NotificationSseE2ETest : AbstractNotificationIntegrationTest() {
     @DisplayName("E2E-C-3: sessionId 파라미터 없이 SSE 구독 시도 → 4xx 응답")
     fun `E2E-C-3 sessionId 없는 SSE 구독 거부`() {
         val url = URL("http://localhost:$port/api/v1/notifications/timer/stream")
-        val conn = (url.openConnection() as HttpURLConnection).apply {
-            setRequestProperty("X-User-Id", "1")
-            setRequestProperty("Accept", "text/event-stream")
-            connectTimeout = 3_000
-            readTimeout = 3_000
-            instanceFollowRedirects = false
-        }
+        val conn =
+            (url.openConnection() as HttpURLConnection).apply {
+                setRequestProperty("X-User-Id", "1")
+                setRequestProperty("Accept", "text/event-stream")
+                connectTimeout = 3_000
+                readTimeout = 3_000
+                instanceFollowRedirects = false
+            }
 
         val responseCode = conn.responseCode
         assertThat(responseCode).`as`("sessionId 없으면 4xx 응답").isGreaterThanOrEqualTo(400)
@@ -155,28 +159,30 @@ class NotificationSseE2ETest : AbstractNotificationIntegrationTest() {
         val heartbeatLatch = CountDownLatch(1)
         val receivedEvents = CopyOnWriteArrayList<SseEvent>()
 
-        val sseThread = Thread {
-            try {
-                val conn = openSseConnection(sessionId, userId = 1L)
-                BufferedReader(InputStreamReader(conn.inputStream)).use { reader ->
-                    var eventName: String? = null
-                    var line: String?
-                    while (reader.readLine().also { line = it } != null) {
-                        when {
-                            line!!.startsWith("event:") -> eventName = line!!.removePrefix("event:").trim()
-                            line!!.startsWith("data:") && eventName != null -> {
-                                receivedEvents += SseEvent(eventName!!, line!!.removePrefix("data:").trim())
-                                if (eventName == "heartbeat") heartbeatLatch.countDown()
-                                eventName = null
+        val sseThread =
+            Thread {
+                try {
+                    val conn = openSseConnection(sessionId, userId = 1L)
+                    BufferedReader(InputStreamReader(conn.inputStream)).use { reader ->
+                        var eventName: String? = null
+                        var line: String?
+                        while (reader.readLine().also { line = it } != null) {
+                            when {
+                                line!!.startsWith("event:") -> eventName = line!!.removePrefix("event:").trim()
+                                line!!.startsWith("data:") && eventName != null -> {
+                                    receivedEvents += SseEvent(eventName!!, line!!.removePrefix("data:").trim())
+                                    if (eventName == "heartbeat") heartbeatLatch.countDown()
+                                    eventName = null
+                                }
                             }
                         }
                     }
+                } catch (_: Exception) {
                 }
-            } catch (_: Exception) {}
-        }.also {
-            it.isDaemon = true
-            it.start()
-        }
+            }.also {
+                it.isDaemon = true
+                it.start()
+            }
 
         // heartbeat는 15초 간격 → 16초 대기
         assertThat(heartbeatLatch.await(16, TimeUnit.SECONDS))
@@ -192,9 +198,14 @@ class NotificationSseE2ETest : AbstractNotificationIntegrationTest() {
     // 헬퍼
     // ──────────────────────────────────────────────────────────────────────
 
-    private fun openSseConnection(sessionId: String, userId: Long): HttpURLConnection =
-        (URL("http://localhost:$port/api/v1/notifications/timer/stream?sessionId=$sessionId")
-            .openConnection() as HttpURLConnection).apply {
+    private fun openSseConnection(
+        sessionId: String,
+        userId: Long,
+    ): HttpURLConnection =
+        (
+            URL("http://localhost:$port/api/v1/notifications/timer/stream?sessionId=$sessionId")
+                .openConnection() as HttpURLConnection
+        ).apply {
             setRequestProperty("X-User-Id", userId.toString())
             setRequestProperty("Accept", "text/event-stream")
             setRequestProperty("Cache-Control", "no-cache")

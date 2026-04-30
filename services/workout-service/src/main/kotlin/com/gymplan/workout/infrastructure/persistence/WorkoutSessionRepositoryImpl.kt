@@ -52,27 +52,51 @@ class WorkoutSessionRepositoryImpl(
                     "\$set",
                     Document(
                         "exercises",
-                        Document("\$cond", Document()
-                            .append("if", Document("\$in", listOf(exerciseId, "\$exercises.exerciseId")))
-                            .append("then",
-                                Document("\$map", Document()
-                                    .append("input", "\$exercises")
-                                    .append("as", "ex")
-                                    .append("in", Document("\$cond", Document()
-                                        .append("if", Document("\$eq", listOf("\$\$ex.exerciseId", exerciseId)))
-                                        .append("then", Document("\$mergeObjects", listOf(
-                                            "\$\$ex",
-                                            Document("sets", Document("\$concatArrays",
-                                                listOf("\$\$ex.sets", listOf(setDoc))
-                                            )),
-                                        )))
-                                        .append("else", "\$\$ex")
-                                    )),
+                        Document(
+                            "\$cond",
+                            Document()
+                                .append("if", Document("\$in", listOf(exerciseId, "\$exercises.exerciseId")))
+                                .append(
+                                    "then",
+                                    Document(
+                                        "\$map",
+                                        Document()
+                                            .append("input", "\$exercises")
+                                            .append("as", "ex")
+                                            .append(
+                                                "in",
+                                                Document(
+                                                    "\$cond",
+                                                    Document()
+                                                        .append("if", Document("\$eq", listOf("\$\$ex.exerciseId", exerciseId)))
+                                                        .append(
+                                                            "then",
+                                                            Document(
+                                                                "\$mergeObjects",
+                                                                listOf(
+                                                                    "\$\$ex",
+                                                                    Document(
+                                                                        "sets",
+                                                                        Document(
+                                                                            "\$concatArrays",
+                                                                            listOf("\$\$ex.sets", listOf(setDoc)),
+                                                                        ),
+                                                                    ),
+                                                                ),
+                                                            ),
+                                                        )
+                                                        .append("else", "\$\$ex"),
+                                                ),
+                                            ),
+                                    ),
+                                )
+                                .append(
+                                    "else",
+                                    Document(
+                                        "\$concatArrays",
+                                        listOf("\$exercises", listOf(newExerciseDoc)),
+                                    ),
                                 ),
-                            )
-                            .append("else", Document("\$concatArrays",
-                                listOf("\$exercises", listOf(newExerciseDoc))
-                            )),
                         ),
                     ),
                 ),

@@ -33,7 +33,6 @@ import javax.sql.DataSource
  */
 @Configuration
 class DataSourceConfig {
-
     /**
      * HikariCP DataSource.
      * spring.datasource.* 기본 설정 + spring.datasource.hikari.* 풀 튜닝 적용.
@@ -53,6 +52,7 @@ class DataSourceConfig {
      */
     @Bean
     @Primary
-    fun dataSource(@Qualifier("hikariDataSource") hikari: HikariDataSource): DataSource =
-        LazyConnectionDataSourceProxy(hikari)
+    fun dataSource(
+        @Qualifier("hikariDataSource") hikari: HikariDataSource,
+    ): DataSource = LazyConnectionDataSourceProxy(hikari)
 }

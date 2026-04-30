@@ -37,11 +37,14 @@ import java.time.ZoneId
 @SpringBootTest
 @AutoConfigureMockMvc
 class TodayPlanIntegrationTest : AbstractIntegrationTest() {
-
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var objectMapper: ObjectMapper
+
     @Autowired lateinit var redis: StringRedisTemplate
+
     @Autowired lateinit var workoutPlanRepository: WorkoutPlanRepository
+
     @Autowired lateinit var planExerciseRepository: PlanExerciseRepository
 
     private val userId = 42L
@@ -58,19 +61,21 @@ class TodayPlanIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun `TC-01 캐시 HIT - Redis에 데이터 있으면 DB 쿼리 없이 반환`() {
-        val cached = TodayPlanResponse(
-            planId = 999L,
-            name = "캐시된 루틴",
-            dayOfWeek = todayDow,
-            exercises = listOf(
-                ExerciseItemResponse(
-                    id = 1L, exerciseId = 10L,
-                    exerciseName = "벤치프레스", muscleGroup = "CHEST",
-                    orderIndex = 0, targetSets = 4, targetReps = 10,
-                    targetWeightKg = BigDecimal("70.0"), restSeconds = 90, notes = null,
-                ),
-            ),
-        )
+        val cached =
+            TodayPlanResponse(
+                planId = 999L,
+                name = "캐시된 루틴",
+                dayOfWeek = todayDow,
+                exercises =
+                    listOf(
+                        ExerciseItemResponse(
+                            id = 1L, exerciseId = 10L,
+                            exerciseName = "벤치프레스", muscleGroup = "CHEST",
+                            orderIndex = 0, targetSets = 4, targetReps = 10,
+                            targetWeightKg = BigDecimal("70.0"), restSeconds = 90, notes = null,
+                        ),
+                    ),
+            )
         redis.opsForValue().set(
             "plan:today:$userId",
             objectMapper.writeValueAsString(cached),
@@ -150,7 +155,7 @@ class TodayPlanIntegrationTest : AbstractIntegrationTest() {
 
         // 캐시 삭제 확인
         assertThat(redis.hasKey("plan:today:$userId")).isFalse()
-        assertThat(redis.hasKey("plan:cache:${userId}:${plan.id}")).isFalse()
+        assertThat(redis.hasKey("plan:cache:$userId:${plan.id}")).isFalse()
 
         // 재조회 시 수정된 이름 반환
         mockMvc.get("/api/v1/plans/today") {
@@ -186,9 +191,10 @@ class TodayPlanIntegrationTest : AbstractIntegrationTest() {
         exerciseName: String,
         muscleGroup: String,
     ): WorkoutPlan {
-        val plan = workoutPlanRepository.save(
-            WorkoutPlan(userId = userId, name = planName, dayOfWeek = dayOfWeek),
-        )
+        val plan =
+            workoutPlanRepository.save(
+                WorkoutPlan(userId = userId, name = planName, dayOfWeek = dayOfWeek),
+            )
         planExerciseRepository.save(
             PlanExercise(
                 plan = plan,

@@ -46,11 +46,12 @@ class NotificationSettingsServiceTest {
         val current = NotificationSettings(userId = userId)
         `when`(settingsRepository.findByUserId(userId)).thenReturn(current)
 
-        val request = UpdateNotificationSettingsRequest(
-            restTimerEnabled = true,
-            workoutCompleteAlert = false,
-            pushEnabled = true,
-        )
+        val request =
+            UpdateNotificationSettingsRequest(
+                restTimerEnabled = true,
+                workoutCompleteAlert = false,
+                pushEnabled = true,
+            )
 
         // When
         val result = settingsService.updateSettings(userId, request)

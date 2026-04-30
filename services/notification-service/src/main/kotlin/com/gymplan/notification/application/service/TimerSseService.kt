@@ -123,7 +123,7 @@ class TimerSseService(
     }
 
     companion object {
-        private const val SSE_TIMEOUT_MS = 30 * 60 * 1000L  // 30분
+        private const val SSE_TIMEOUT_MS = 30 * 60 * 1000L // 30분
         private const val HEARTBEAT_INTERVAL_SEC = 15L
     }
 }

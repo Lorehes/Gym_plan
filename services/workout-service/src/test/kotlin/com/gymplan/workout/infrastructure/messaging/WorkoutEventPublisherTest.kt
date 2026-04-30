@@ -61,9 +61,10 @@ class WorkoutEventPublisherTest {
     @Test
     @DisplayName("TC-11: Kafka 발행 실패(retries 소진) → DLQ 토픽으로 이동")
     fun `발행 실패 시 DLQ 토픽에 발행`() {
-        val failedFuture = CompletableFuture.failedFuture<SendResult<String, Any>>(
-            RuntimeException("Kafka broker unavailable"),
-        )
+        val failedFuture =
+            CompletableFuture.failedFuture<SendResult<String, Any>>(
+                RuntimeException("Kafka broker unavailable"),
+            )
         val dlqFuture = CompletableFuture.completedFuture(mock<SendResult<String, Any>>())
 
         whenever(kafkaTemplate.send(WorkoutEventPublisher.TOPIC_SET_LOGGED, event.sessionId, event))
@@ -83,12 +84,14 @@ class WorkoutEventPublisherTest {
     @Test
     @DisplayName("TC-11: DLQ 발행도 실패 → 예외 흡수 (API 응답에 영향 없음)")
     fun `DLQ 발행 실패도 예외 흡수`() {
-        val failedFuture = CompletableFuture.failedFuture<SendResult<String, Any>>(
-            RuntimeException("Kafka broker unavailable"),
-        )
-        val dlqFailedFuture = CompletableFuture.failedFuture<SendResult<String, Any>>(
-            RuntimeException("DLQ also unavailable"),
-        )
+        val failedFuture =
+            CompletableFuture.failedFuture<SendResult<String, Any>>(
+                RuntimeException("Kafka broker unavailable"),
+            )
+        val dlqFailedFuture =
+            CompletableFuture.failedFuture<SendResult<String, Any>>(
+                RuntimeException("DLQ also unavailable"),
+            )
 
         whenever(kafkaTemplate.send(WorkoutEventPublisher.TOPIC_SET_LOGGED, event.sessionId, event))
             .thenReturn(failedFuture)

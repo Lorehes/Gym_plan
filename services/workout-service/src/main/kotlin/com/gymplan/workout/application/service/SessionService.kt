@@ -43,7 +43,6 @@ class SessionService(
 ) {
     private val log = LoggerFactory.getLogger(SessionService::class.java)
 
-
     // ─────────────────── 세션 시작 ───────────────────
 
     fun startSession(

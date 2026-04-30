@@ -13,12 +13,13 @@ import org.springframework.stereotype.Component
  */
 @Component
 class UserMetrics(registry: MeterRegistry) {
+    val registrations: Counter =
+        Counter.builder("gymplan_user_registrations_total")
+            .description("신규 회원가입 수")
+            .register(registry)
 
-    val registrations: Counter = Counter.builder("gymplan_user_registrations_total")
-        .description("신규 회원가입 수")
-        .register(registry)
-
-    val activeUsers: Counter = Counter.builder("gymplan_active_users_daily")
-        .description("로그인 이벤트 수 (DAU 근사값 — increase([24h])로 집계)")
-        .register(registry)
+    val activeUsers: Counter =
+        Counter.builder("gymplan_active_users_daily")
+            .description("로그인 이벤트 수 (DAU 근사값 — increase([24h])로 집계)")
+            .register(registry)
 }

@@ -32,9 +32,10 @@ import java.util.Properties
 @SpringBootTest
 @AutoConfigureMockMvc
 class WorkoutKafkaE2ETest : AbstractIntegrationTest() {
-
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var objectMapper: ObjectMapper
+
     @Autowired lateinit var sessionRepository: WorkoutSessionRepository
 
     private val userId = 99L
@@ -62,7 +63,7 @@ class WorkoutKafkaE2ETest : AbstractIntegrationTest() {
     @Test
     @DisplayName(
         "E2E-A: 세션 시작 → 세트 3개 기록 → 완료 " +
-            "→ workout.set.logged × 3 + workout.session.completed × 1 발행 검증"
+            "→ workout.set.logged × 3 + workout.session.completed × 1 발행 검증",
     )
     fun `E2E-A 전체 운동 흐름 Kafka 이벤트 검증`() {
         // ── Step 1: 세션 시작 ──
@@ -160,13 +161,17 @@ class WorkoutKafkaE2ETest : AbstractIntegrationTest() {
     // 헬퍼
     // ──────────────────────────────────────────────────────────────────────
 
-    private fun startSession(planId: Int? = null, planName: String? = null): String {
+    private fun startSession(
+        planId: Int? = null,
+        planName: String? = null,
+    ): String {
         val body = if (planId != null) """{"planId": $planId, "planName": "$planName"}""" else "{}"
-        val result = mockMvc.post("/api/v1/sessions") {
-            header("X-User-Id", userId)
-            contentType = MediaType.APPLICATION_JSON
-            content = body
-        }.andExpect { status { isCreated() } }.andReturn()
+        val result =
+            mockMvc.post("/api/v1/sessions") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = body
+            }.andExpect { status { isCreated() } }.andReturn()
         return objectMapper.readTree(result.response.contentAsString)["data"]["sessionId"].asText()
     }
 
@@ -182,7 +187,8 @@ class WorkoutKafkaE2ETest : AbstractIntegrationTest() {
         mockMvc.post("/api/v1/sessions/$sessionId/sets") {
             header("X-User-Id", userId)
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "exerciseId": "$exerciseId",
                   "exerciseName": "$exerciseName",
@@ -192,11 +198,14 @@ class WorkoutKafkaE2ETest : AbstractIntegrationTest() {
                   "weightKg": $weightKg,
                   "isSuccess": true
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect { status { isCreated() } }
     }
 
-    private fun buildConsumer(groupId: String, topic: String): KafkaConsumer<String, String> =
+    private fun buildConsumer(
+        groupId: String,
+        topic: String,
+    ): KafkaConsumer<String, String> =
         KafkaConsumer<String, String>(
             Properties().apply {
                 put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.bootstrapServers)
@@ -205,7 +214,7 @@ class WorkoutKafkaE2ETest : AbstractIntegrationTest() {
                 put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
                 put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
                 put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true")
-            }
+            },
         ).also { it.subscribe(listOf(topic)) }
 
     private fun pollEvents(

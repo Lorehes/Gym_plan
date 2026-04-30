@@ -37,9 +37,10 @@ import java.math.BigDecimal
 @AutoConfigureMockMvc
 @Tag("benchmark")
 class TodayPlanLatencyBenchmarkTest : AbstractIntegrationTest() {
-
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var objectMapper: ObjectMapper
+
     @Autowired lateinit var redis: StringRedisTemplate
 
     private val userId = 777L
@@ -55,25 +56,27 @@ class TodayPlanLatencyBenchmarkTest : AbstractIntegrationTest() {
     @DisplayName("캐시 HIT P95 < 200ms — Redis → Jackson → HTTP 응답 전체 경로")
     fun `캐시HIT_P95_200ms_이하`() {
         // Redis에 오늘의 루틴 직접 세팅 (cache HIT 시나리오)
-        val cachedResponse = TodayPlanResponse(
-            planId = 1L,
-            name = "가슴/삼두 루틴",
-            dayOfWeek = 0,
-            exercises = List(5) { i ->
-                ExerciseItemResponse(
-                    id = (i + 1).toLong(),
-                    exerciseId = (i + 10).toLong(),
-                    exerciseName = "운동종목-$i",
-                    muscleGroup = "CHEST",
-                    orderIndex = i,
-                    targetSets = 4,
-                    targetReps = 10,
-                    targetWeightKg = BigDecimal("70.0"),
-                    restSeconds = 90,
-                    notes = null,
-                )
-            },
-        )
+        val cachedResponse =
+            TodayPlanResponse(
+                planId = 1L,
+                name = "가슴/삼두 루틴",
+                dayOfWeek = 0,
+                exercises =
+                    List(5) { i ->
+                        ExerciseItemResponse(
+                            id = (i + 1).toLong(),
+                            exerciseId = (i + 10).toLong(),
+                            exerciseName = "운동종목-$i",
+                            muscleGroup = "CHEST",
+                            orderIndex = i,
+                            targetSets = 4,
+                            targetReps = 10,
+                            targetWeightKg = BigDecimal("70.0"),
+                            restSeconds = 90,
+                            notes = null,
+                        )
+                    },
+            )
         redis.opsForValue().set(
             "plan:today:$userId",
             objectMapper.writeValueAsString(cachedResponse),
@@ -92,10 +95,11 @@ class TodayPlanLatencyBenchmarkTest : AbstractIntegrationTest() {
         // BeforeEach에서 캐시를 비웠으므로 최초 호출은 MISS, 이후는 HIT
         // MISS 측정을 위해 각 호출 전 캐시 삭제
 
-        val latencies = measureLatencies(WARMUP_COUNT + MEASURE_COUNT) {
-            redis.delete("plan:today:$userId")  // 매번 캐시 무효화 → 강제 MISS
-            callTodayPlan()
-        }
+        val latencies =
+            measureLatencies(WARMUP_COUNT + MEASURE_COUNT) {
+                redis.delete("plan:today:$userId") // 매번 캐시 무효화 → 강제 MISS
+                callTodayPlan()
+            }
         reportAndAssert("캐시 MISS", latencies)
     }
 
@@ -108,15 +112,21 @@ class TodayPlanLatencyBenchmarkTest : AbstractIntegrationTest() {
         }.andExpect {
             status { isOk() }
         }
-        return (System.nanoTime() - start) / 1_000_000L  // ns → ms
+        return (System.nanoTime() - start) / 1_000_000L // ns → ms
     }
 
-    private fun measureLatencies(total: Int, block: () -> Long): List<Long> {
+    private fun measureLatencies(
+        total: Int,
+        block: () -> Long,
+    ): List<Long> {
         val all = (1..total).map { block() }
-        return all.drop(WARMUP_COUNT)  // 워밍업 제외
+        return all.drop(WARMUP_COUNT) // 워밍업 제외
     }
 
-    private fun reportAndAssert(label: String, latenciesMs: List<Long>) {
+    private fun reportAndAssert(
+        label: String,
+        latenciesMs: List<Long>,
+    ) {
         val sorted = latenciesMs.sorted()
         val p50 = percentile(sorted, 50)
         val p95 = percentile(sorted, 95)
@@ -144,7 +154,10 @@ class TodayPlanLatencyBenchmarkTest : AbstractIntegrationTest() {
             .isLessThanOrEqualTo(P95_TARGET_MS)
     }
 
-    private fun percentile(sorted: List<Long>, pct: Int): Long {
+    private fun percentile(
+        sorted: List<Long>,
+        pct: Int,
+    ): Long {
         val idx = (sorted.size * pct / 100.0).toInt().coerceAtMost(sorted.size - 1)
         return sorted[idx]
     }

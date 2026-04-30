@@ -28,7 +28,6 @@ import org.junit.jupiter.api.Test
 @Disabled("인프라 확장 필요 — docs/specs/e2e-scenario-workout.md '활성화 체크리스트' 참조")
 @DisplayName("[E2E-W] 운동 실행 + Kafka 비동기 흐름")
 class ScenarioWorkoutTest : AbstractE2ETest() {
-
     @Nested
     @DisplayName("E2E-W-01: 세션 시작 → 201 IN_PROGRESS")
     inner class StartSession {

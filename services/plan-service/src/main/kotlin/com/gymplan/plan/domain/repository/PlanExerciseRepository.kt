@@ -4,7 +4,6 @@ import com.gymplan.plan.domain.entity.PlanExercise
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface PlanExerciseRepository : JpaRepository<PlanExercise, Long> {
-
     fun findByPlanIdOrderByOrderIndexAsc(planId: Long): List<PlanExercise>
 
     fun countByPlanId(planId: Long): Long

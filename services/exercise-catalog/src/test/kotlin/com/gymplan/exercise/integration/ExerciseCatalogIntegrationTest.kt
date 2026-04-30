@@ -18,7 +18,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.springframework.transaction.annotation.Transactional
 
 /**
  * exercise-catalog 통합 테스트.
@@ -113,7 +112,7 @@ class ExerciseCatalogIntegrationTest : AbstractIntegrationTest() {
 
         mockMvc.get("/api/v1/exercises") {
             header("X-User-Id", "1")
-            param("q", "벤치프레스")   // 전체 토큰으로 검색 (standard analyzer 호환)
+            param("q", "벤치프레스") // 전체 토큰으로 검색 (standard analyzer 호환)
         }.andExpect {
             status { isOk() }
             jsonPath("$.success") { value(true) }
@@ -327,7 +326,7 @@ class ExerciseCatalogIntegrationTest : AbstractIntegrationTest() {
         elasticsearchOperations.indexOps(ExerciseDocument::class.java).refresh()
         mockMvc.get("/api/v1/exercises") {
             header("X-User-Id", "42")
-            param("q", "하프 스쿼트")   // 전체 단어 쿼리 (standard analyzer 호환)
+            param("q", "하프 스쿼트") // 전체 단어 쿼리 (standard analyzer 호환)
         }.andExpect {
             status { isOk() }
             // contentAsString 은 ISO-8859-1 로 읽을 수 있으므로 jsonPath 로 검증

@@ -38,7 +38,6 @@ data class PageResponse<T>(
             )
 
         /** 변환 없이 그대로 사용 */
-        fun <T> from(page: org.springframework.data.domain.Page<T>): PageResponse<T> =
-            from(page) { it }
+        fun <T> from(page: org.springframework.data.domain.Page<T>): PageResponse<T> = from(page) { it }
     }
 }

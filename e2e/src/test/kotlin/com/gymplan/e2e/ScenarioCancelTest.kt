@@ -26,7 +26,6 @@ import org.junit.jupiter.api.Test
 @Disabled("인프라 확장 필요 — docs/specs/e2e-scenario-cancel.md '활성화 체크리스트' 참조")
 @DisplayName("[E2E-X] 세션 취소 + 멱등성")
 class ScenarioCancelTest : AbstractE2ETest() {
-
     @Nested
     @DisplayName("E2E-X-01: cancel → 204 + status=CANCELLED")
     inner class CancelMarksStatus {

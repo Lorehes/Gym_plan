@@ -2,6 +2,7 @@ package com.gymplan.exercise.presentation.controller
 
 import com.gymplan.common.dto.ApiResponse
 import com.gymplan.common.dto.PageResponse
+import com.gymplan.common.security.CurrentUserId
 import com.gymplan.exercise.application.dto.CreateExerciseRequest
 import com.gymplan.exercise.application.dto.ExerciseDetailResponse
 import com.gymplan.exercise.application.dto.ExerciseSummaryResponse
@@ -9,7 +10,6 @@ import com.gymplan.exercise.application.service.ExerciseSearchService
 import com.gymplan.exercise.application.service.ExerciseService
 import com.gymplan.exercise.domain.vo.Equipment
 import com.gymplan.exercise.domain.vo.MuscleGroup
-import com.gymplan.common.security.CurrentUserId
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min

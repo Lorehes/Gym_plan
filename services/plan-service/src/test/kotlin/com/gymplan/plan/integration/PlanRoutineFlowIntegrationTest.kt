@@ -1,6 +1,8 @@
 package com.gymplan.plan.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.gymplan.plan.domain.repository.PlanExerciseRepository
+import com.gymplan.plan.domain.repository.WorkoutPlanRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -14,8 +16,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
-import com.gymplan.plan.domain.repository.PlanExerciseRepository
-import com.gymplan.plan.domain.repository.WorkoutPlanRepository
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -51,11 +51,14 @@ import java.time.ZoneId
 @SpringBootTest
 @AutoConfigureMockMvc
 class PlanRoutineFlowIntegrationTest : AbstractIntegrationTest() {
-
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var objectMapper: ObjectMapper
+
     @Autowired lateinit var redis: StringRedisTemplate
+
     @Autowired lateinit var workoutPlanRepository: WorkoutPlanRepository
+
     @Autowired lateinit var planExerciseRepository: PlanExerciseRepository
 
     /** 기존 테스트(userId=1,2,42)와 격리하기 위해 별도 userId 사용 */
@@ -78,30 +81,32 @@ class PlanRoutineFlowIntegrationTest : AbstractIntegrationTest() {
     @Test
     @DisplayName("시나리오 2+3: 루틴 생성 → 운동 추가 → 오늘의 루틴 캐시 미스 → 히트 전체 흐름")
     fun `시나리오2and3_루틴생성운동추가오늘루틴캐시흐름`() {
-
         // ─── STEP-1: 루틴 생성 (오늘 요일로 배정) ───
-        val createPlanResult = mockMvc.post("/api/v1/plans") {
-            header("X-User-Id", userId)
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"name": "가슴/삼두 루틴", "dayOfWeek": $todayDow}"""
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.success") { value(true) }
-            jsonPath("$.data.planId") { isNumber() }
-            jsonPath("$.data.name") { value("가슴/삼두 루틴") }
-            jsonPath("$.data.dayOfWeek") { value(todayDow) }
-        }.andReturn()
+        val createPlanResult =
+            mockMvc.post("/api/v1/plans") {
+                header("X-User-Id", userId)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name": "가슴/삼두 루틴", "dayOfWeek": $todayDow}"""
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.success") { value(true) }
+                jsonPath("$.data.planId") { isNumber() }
+                jsonPath("$.data.name") { value("가슴/삼두 루틴") }
+                jsonPath("$.data.dayOfWeek") { value(todayDow) }
+            }.andReturn()
 
-        val planId = objectMapper
-            .readTree(createPlanResult.response.contentAsString)
-            .path("data").path("planId").asLong()
+        val planId =
+            objectMapper
+                .readTree(createPlanResult.response.contentAsString)
+                .path("data").path("planId").asLong()
         assertThat(planId).isPositive()
 
         // ─── STEP-2: 운동 첫 번째 추가 (벤치프레스) ───
         mockMvc.post("/api/v1/plans/$planId/exercises") {
             header("X-User-Id", userId)
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "exerciseId":    10,
                   "exerciseName":  "벤치프레스",
@@ -111,7 +116,7 @@ class PlanRoutineFlowIntegrationTest : AbstractIntegrationTest() {
                   "targetWeightKg": 70.0,
                   "restSeconds":   90
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.data.exerciseName") { value("벤치프레스") }
@@ -125,7 +130,8 @@ class PlanRoutineFlowIntegrationTest : AbstractIntegrationTest() {
         mockMvc.post("/api/v1/plans/$planId/exercises") {
             header("X-User-Id", userId)
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "exerciseId":   25,
                   "exerciseName": "트라이셉스 푸시다운",
@@ -134,12 +140,12 @@ class PlanRoutineFlowIntegrationTest : AbstractIntegrationTest() {
                   "targetReps":   12,
                   "restSeconds":  60
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.data.exerciseName") { value("트라이셉스 푸시다운") }
             jsonPath("$.data.muscleGroup") { value("ARMS") }
-            jsonPath("$.data.orderIndex") { value(1) }  // 자동 배정
+            jsonPath("$.data.orderIndex") { value(1) } // 자동 배정
         }
 
         // ─── STEP-3: 루틴 상세 조회 → 운동 2개 + orderIndex 오름차순 ───
@@ -248,7 +254,7 @@ class PlanRoutineFlowIntegrationTest : AbstractIntegrationTest() {
         mockMvc.get("/api/v1/plans/today") {
             header("X-User-Id", userId)
         }.andExpect {
-            status { isOk() }                      // 200 OK (404 아님 — 명세 §인수기준 MUST)
+            status { isOk() } // 200 OK (404 아님 — 명세 §인수기준 MUST)
             jsonPath("$.success") { value(true) }
             jsonPath("$.data") { value(null as Any?) }
         }

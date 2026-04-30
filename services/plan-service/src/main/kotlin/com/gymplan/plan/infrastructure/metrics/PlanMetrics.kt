@@ -13,16 +13,17 @@ import org.springframework.stereotype.Component
  */
 @Component
 class PlanMetrics(registry: MeterRegistry) {
+    val todayPlanCacheHit: Counter =
+        Counter.builder("cache_gets_total")
+            .description("오늘의 루틴 캐시 조회 결과")
+            .tag("cache", "today-plan")
+            .tag("result", "hit")
+            .register(registry)
 
-    val todayPlanCacheHit: Counter = Counter.builder("cache_gets_total")
-        .description("오늘의 루틴 캐시 조회 결과")
-        .tag("cache", "today-plan")
-        .tag("result", "hit")
-        .register(registry)
-
-    val todayPlanCacheMiss: Counter = Counter.builder("cache_gets_total")
-        .description("오늘의 루틴 캐시 조회 결과")
-        .tag("cache", "today-plan")
-        .tag("result", "miss")
-        .register(registry)
+    val todayPlanCacheMiss: Counter =
+        Counter.builder("cache_gets_total")
+            .description("오늘의 루틴 캐시 조회 결과")
+            .tag("cache", "today-plan")
+            .tag("result", "miss")
+            .register(registry)
 }

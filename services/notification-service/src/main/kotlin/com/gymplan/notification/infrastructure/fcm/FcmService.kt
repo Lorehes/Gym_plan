@@ -20,10 +20,11 @@ class FcmService(
         totalVolume: Double,
         durationMin: Long,
     ) {
-        val token = fcmTokenRepository.findByUserId(userId) ?: run {
-            log.info("FCM 토큰 없음 (등록 미완료): userId={}", userId)
-            return
-        }
+        val token =
+            fcmTokenRepository.findByUserId(userId) ?: run {
+                log.info("FCM 토큰 없음 (등록 미완료): userId={}", userId)
+                return
+            }
 
         val body = "오늘 운동 완료! 총 볼륨 ${totalVolume}kg, ${durationMin}분 수고했어요 💪"
         val message =
@@ -43,17 +44,23 @@ class FcmService(
             FirebaseMessaging.getInstance().send(message)
             log.info("FCM 운동 완료 알림 발송: userId={}, sessionId={}", userId, sessionId)
         } catch (e: FirebaseMessagingException) {
-            log.error("FCM 운동 완료 알림 발송 실패: userId={}, sessionId={}, errorCode={}",
-                userId, sessionId, e.messagingErrorCode, e)
+            log.error(
+                "FCM 운동 완료 알림 발송 실패: userId={}, sessionId={}, errorCode={}",
+                userId,
+                sessionId,
+                e.messagingErrorCode,
+                e,
+            )
             throw e
         }
     }
 
     fun sendWelcome(userId: Long) {
-        val token = fcmTokenRepository.findByUserId(userId) ?: run {
-            log.info("FCM 토큰 없음 (등록 미완료): userId={}", userId)
-            return
-        }
+        val token =
+            fcmTokenRepository.findByUserId(userId) ?: run {
+                log.info("FCM 토큰 없음 (등록 미완료): userId={}", userId)
+                return
+            }
 
         val message =
             Message.builder()

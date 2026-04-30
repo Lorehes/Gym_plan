@@ -39,11 +39,12 @@ class WorkoutEventConsumer(
             return
         }
 
-        val userId = event.userId.toLongOrNull() ?: run {
-            log.warn("유효하지 않은 userId: {}", event.userId)
-            ack.acknowledge()
-            return
-        }
+        val userId =
+            event.userId.toLongOrNull() ?: run {
+                log.warn("유효하지 않은 userId: {}", event.userId)
+                ack.acknowledge()
+                return
+            }
 
         val settings = settingsRepository.findByUserId(userId)
         if (!settings.pushEnabled || !settings.workoutCompleteAlert) {

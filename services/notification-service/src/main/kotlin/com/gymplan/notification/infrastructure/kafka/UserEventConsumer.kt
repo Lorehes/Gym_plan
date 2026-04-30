@@ -37,11 +37,12 @@ class UserEventConsumer(
             return
         }
 
-        val userId = event.userId.toLongOrNull() ?: run {
-            log.warn("유효하지 않은 userId: {}", event.userId)
-            ack.acknowledge()
-            return
-        }
+        val userId =
+            event.userId.toLongOrNull() ?: run {
+                log.warn("유효하지 않은 userId: {}", event.userId)
+                ack.acknowledge()
+                return
+            }
 
         fcmService.sendWelcome(userId)
         ack.acknowledge()

@@ -37,10 +37,12 @@ import java.math.BigDecimal
 @SpringBootTest
 @AutoConfigureMockMvc
 class PlanControllerIntegrationTest : AbstractIntegrationTest() {
-
     @Autowired lateinit var mockMvc: MockMvc
+
     @Autowired lateinit var workoutPlanRepository: WorkoutPlanRepository
+
     @Autowired lateinit var planExerciseRepository: PlanExerciseRepository
+
     @Autowired lateinit var redis: StringRedisTemplate
 
     private val userId = 1L
@@ -99,9 +101,10 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
 
     @Test
     fun `TC-05 타인 루틴 접근 시 403 Forbidden`() {
-        val otherPlan = workoutPlanRepository.save(
-            WorkoutPlan(userId = otherUserId, name = "타인 루틴", dayOfWeek = 1),
-        )
+        val otherPlan =
+            workoutPlanRepository.save(
+                WorkoutPlan(userId = otherUserId, name = "타인 루틴", dayOfWeek = 1),
+            )
 
         mockMvc.get("/api/v1/plans/${otherPlan.id}") {
             header("X-User-Id", userId)
@@ -120,7 +123,8 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         mockMvc.post("/api/v1/plans/${plan.id}/exercises") {
             header("X-User-Id", userId)
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "exerciseId": 20,
                   "exerciseName": "랫풀다운",
@@ -129,7 +133,7 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
                   "targetReps": 12,
                   "restSeconds": 60
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.data.exerciseName") { value("랫풀다운") }
@@ -145,7 +149,7 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         assertThat(exercises[0].exerciseId).isEqualTo(20L)
 
         // 캐시 무효화 확인
-        assertThat(redis.hasKey("plan:cache:${userId}:${plan.id}")).isFalse()
+        assertThat(redis.hasKey("plan:cache:$userId:${plan.id}")).isFalse()
     }
 
     // ─────────────────── TC-07: orderedIds 불일치 ───────────────────
@@ -156,8 +160,10 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         repeat(4) { i ->
             planExerciseRepository.save(
                 PlanExercise(
-                    plan = plan, exerciseId = (i + 1).toLong(),
-                    exerciseName = "운동$i", muscleGroup = "CHEST",
+                    plan = plan,
+                    exerciseId = (i + 1).toLong(),
+                    exerciseName = "운동$i",
+                    muscleGroup = "CHEST",
                     orderIndex = i,
                 ),
             )
@@ -166,7 +172,7 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         mockMvc.put("/api/v1/plans/${plan.id}/exercises/reorder") {
             header("X-User-Id", userId)
             contentType = MediaType.APPLICATION_JSON
-            content = """{"orderedIds": [1, 2, 3]}"""  // 4개여야 하는데 3개
+            content = """{"orderedIds": [1, 2, 3]}""" // 4개여야 하는데 3개
         }.andExpect {
             status { isBadRequest() }
             jsonPath("$.error.code") { value("VALIDATION_FAILED") }
@@ -176,15 +182,18 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
     @Test
     fun `운동 순서 변경 - 정상`() {
         val plan = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴", dayOfWeek = 0))
-        val exercises = (0 until 3).map { i ->
-            planExerciseRepository.save(
-                PlanExercise(
-                    plan = plan, exerciseId = (i + 1).toLong(),
-                    exerciseName = "운동$i", muscleGroup = "CHEST",
-                    orderIndex = i,
-                ),
-            )
-        }
+        val exercises =
+            (0 until 3).map { i ->
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = plan,
+                        exerciseId = (i + 1).toLong(),
+                        exerciseName = "운동$i",
+                        muscleGroup = "CHEST",
+                        orderIndex = i,
+                    ),
+                )
+            }
 
         val reversed = exercises.reversed().map { it.id!! }
         mockMvc.put("/api/v1/plans/${plan.id}/exercises/reorder") {
@@ -249,13 +258,14 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         mockMvc.post("/api/v1/plans/${plan.id}/exercises") {
             header("X-User-Id", userId)
             contentType = MediaType.APPLICATION_JSON
-            content = """
+            content =
+                """
                 {
                   "exerciseId": 20,
                   "exerciseName": "랫풀다운",
                   "muscleGroup": "INVALID_GROUP"
                 }
-            """.trimIndent()
+                """.trimIndent()
         }.andExpect {
             status { isBadRequest() }
             jsonPath("$.error.code") { value("VALIDATION_FAILED") }
@@ -276,24 +286,24 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
     @Nested
     @DisplayName("TC-12: PUT /api/v1/plans/{planId}/exercises/{exerciseItemId}")
     inner class UpdateExercise {
-
         @Test
         @DisplayName("TC-12-1: 정상 수정 — targetSets·targetWeightKg 변경 + 캐시 무효화")
         fun `TC-12-1 운동 수정 - 정상`() {
             val plan = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴", dayOfWeek = 0))
-            val exercise = planExerciseRepository.save(
-                PlanExercise(
-                    plan = plan,
-                    exerciseId = 10L,
-                    exerciseName = "벤치프레스",
-                    muscleGroup = "CHEST",
-                    orderIndex = 0,
-                    targetSets = 3,
-                    targetReps = 10,
-                    targetWeight = BigDecimal("60.00"),
-                    restSeconds = 90,
-                ),
-            )
+            val exercise =
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = plan,
+                        exerciseId = 10L,
+                        exerciseName = "벤치프레스",
+                        muscleGroup = "CHEST",
+                        orderIndex = 0,
+                        targetSets = 3,
+                        targetReps = 10,
+                        targetWeight = BigDecimal("60.00"),
+                        restSeconds = 90,
+                    ),
+                )
             // 캐시 미리 설정
             redis.opsForValue().set("plan:today:$userId", "{}")
             redis.opsForValue().set("plan:cache:$userId:${plan.id}", "{}")
@@ -301,13 +311,14 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
             mockMvc.put("/api/v1/plans/${plan.id}/exercises/${exercise.id}") {
                 header("X-User-Id", userId)
                 contentType = MediaType.APPLICATION_JSON
-                content = """
+                content =
+                    """
                     {
                       "targetSets": 5,
                       "targetWeightKg": 80.00,
                       "notes": "무게 증가"
                     }
-                """.trimIndent()
+                    """.trimIndent()
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.success") { value(true) }
@@ -347,21 +358,23 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         @Test
         @DisplayName("TC-12-3: 타인 루틴의 운동 수정 시도 → 403 PLAN_ACCESS_DENIED")
         fun `TC-12-3 운동 수정 - 타인 루틴`() {
-            val otherPlan = workoutPlanRepository.save(
-                WorkoutPlan(userId = otherUserId, name = "타인 루틴", dayOfWeek = 1),
-            )
-            val exercise = planExerciseRepository.save(
-                PlanExercise(
-                    plan = otherPlan,
-                    exerciseId = 10L,
-                    exerciseName = "스쿼트",
-                    muscleGroup = "LEGS",
-                    orderIndex = 0,
-                ),
-            )
+            val otherPlan =
+                workoutPlanRepository.save(
+                    WorkoutPlan(userId = otherUserId, name = "타인 루틴", dayOfWeek = 1),
+                )
+            val exercise =
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = otherPlan,
+                        exerciseId = 10L,
+                        exerciseName = "스쿼트",
+                        muscleGroup = "LEGS",
+                        orderIndex = 0,
+                    ),
+                )
 
             mockMvc.put("/api/v1/plans/${otherPlan.id}/exercises/${exercise.id}") {
-                header("X-User-Id", userId)   // userId != otherUserId
+                header("X-User-Id", userId) // userId != otherUserId
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"targetSets": 4}"""
             }.andExpect {
@@ -390,15 +403,16 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         fun `TC-12-5 운동 수정 - 다른 plan의 exerciseItemId`() {
             val planA = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴A", dayOfWeek = 0))
             val planB = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴B", dayOfWeek = 1))
-            val exerciseInB = planExerciseRepository.save(
-                PlanExercise(
-                    plan = planB,
-                    exerciseId = 20L,
-                    exerciseName = "데드리프트",
-                    muscleGroup = "BACK",
-                    orderIndex = 0,
-                ),
-            )
+            val exerciseInB =
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = planB,
+                        exerciseId = 20L,
+                        exerciseName = "데드리프트",
+                        muscleGroup = "BACK",
+                        orderIndex = 0,
+                    ),
+                )
 
             // planA로 요청했지만 exerciseItemId는 planB 소속
             mockMvc.put("/api/v1/plans/${planA.id}/exercises/${exerciseInB.id}") {
@@ -415,15 +429,16 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         @DisplayName("TC-12-6: muscleGroup 유효하지 않은 값 → 400 VALIDATION_FAILED")
         fun `TC-12-6 운동 수정 - muscleGroup 유효하지 않은 값`() {
             val plan = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴", dayOfWeek = 0))
-            val exercise = planExerciseRepository.save(
-                PlanExercise(
-                    plan = plan,
-                    exerciseId = 10L,
-                    exerciseName = "벤치프레스",
-                    muscleGroup = "CHEST",
-                    orderIndex = 0,
-                ),
-            )
+            val exercise =
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = plan,
+                        exerciseId = 10L,
+                        exerciseName = "벤치프레스",
+                        muscleGroup = "CHEST",
+                        orderIndex = 0,
+                    ),
+                )
 
             mockMvc.put("/api/v1/plans/${plan.id}/exercises/${exercise.id}") {
                 header("X-User-Id", userId)
@@ -453,17 +468,18 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
     @Nested
     @DisplayName("TC-13: DELETE /api/v1/plans/{planId}/exercises/{exerciseItemId}")
     inner class DeleteExercise {
-
         @Test
         @DisplayName("TC-13-1: 정상 삭제 → 204 + DB 제거 + 캐시 무효화")
         fun `TC-13-1 운동 삭제 - 정상`() {
             val plan = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴", dayOfWeek = 0))
-            val e1 = planExerciseRepository.save(
-                PlanExercise(plan = plan, exerciseId = 10L, exerciseName = "벤치프레스", muscleGroup = "CHEST", orderIndex = 0),
-            )
-            val e2 = planExerciseRepository.save(
-                PlanExercise(plan = plan, exerciseId = 20L, exerciseName = "딥스", muscleGroup = "CHEST", orderIndex = 1),
-            )
+            val e1 =
+                planExerciseRepository.save(
+                    PlanExercise(plan = plan, exerciseId = 10L, exerciseName = "벤치프레스", muscleGroup = "CHEST", orderIndex = 0),
+                )
+            val e2 =
+                planExerciseRepository.save(
+                    PlanExercise(plan = plan, exerciseId = 20L, exerciseName = "딥스", muscleGroup = "CHEST", orderIndex = 1),
+                )
             // 캐시 미리 설정
             redis.opsForValue().set("plan:today:$userId", "{}")
             redis.opsForValue().set("plan:cache:$userId:${plan.id}", "{}")
@@ -498,21 +514,23 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         @Test
         @DisplayName("TC-13-3: 타인 루틴의 운동 삭제 시도 → 403 PLAN_ACCESS_DENIED")
         fun `TC-13-3 운동 삭제 - 타인 루틴`() {
-            val otherPlan = workoutPlanRepository.save(
-                WorkoutPlan(userId = otherUserId, name = "타인 루틴", dayOfWeek = 1),
-            )
-            val exercise = planExerciseRepository.save(
-                PlanExercise(
-                    plan = otherPlan,
-                    exerciseId = 10L,
-                    exerciseName = "스쿼트",
-                    muscleGroup = "LEGS",
-                    orderIndex = 0,
-                ),
-            )
+            val otherPlan =
+                workoutPlanRepository.save(
+                    WorkoutPlan(userId = otherUserId, name = "타인 루틴", dayOfWeek = 1),
+                )
+            val exercise =
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = otherPlan,
+                        exerciseId = 10L,
+                        exerciseName = "스쿼트",
+                        muscleGroup = "LEGS",
+                        orderIndex = 0,
+                    ),
+                )
 
             mockMvc.delete("/api/v1/plans/${otherPlan.id}/exercises/${exercise.id}") {
-                header("X-User-Id", userId)   // userId != otherUserId
+                header("X-User-Id", userId) // userId != otherUserId
             }.andExpect {
                 status { isForbidden() }
                 jsonPath("$.error.code") { value("PLAN_ACCESS_DENIED") }
@@ -540,15 +558,16 @@ class PlanControllerIntegrationTest : AbstractIntegrationTest() {
         fun `TC-13-5 운동 삭제 - 다른 plan의 exerciseItemId`() {
             val planA = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴A", dayOfWeek = 0))
             val planB = workoutPlanRepository.save(WorkoutPlan(userId = userId, name = "루틴B", dayOfWeek = 1))
-            val exerciseInB = planExerciseRepository.save(
-                PlanExercise(
-                    plan = planB,
-                    exerciseId = 20L,
-                    exerciseName = "데드리프트",
-                    muscleGroup = "BACK",
-                    orderIndex = 0,
-                ),
-            )
+            val exerciseInB =
+                planExerciseRepository.save(
+                    PlanExercise(
+                        plan = planB,
+                        exerciseId = 20L,
+                        exerciseName = "데드리프트",
+                        muscleGroup = "BACK",
+                        orderIndex = 0,
+                    ),
+                )
 
             // planA로 요청했지만 exerciseItemId는 planB 소속
             mockMvc.delete("/api/v1/plans/${planA.id}/exercises/${exerciseInB.id}") {

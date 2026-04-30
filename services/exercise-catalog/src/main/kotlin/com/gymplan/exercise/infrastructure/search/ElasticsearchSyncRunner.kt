@@ -23,17 +23,17 @@ class ElasticsearchSyncRunner(
     private val exerciseRepository: ExerciseRepository,
     private val elasticsearchOperations: ElasticsearchOperations,
 ) : ApplicationRunner {
-
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun run(args: ApplicationArguments) {
         val mysqlCount = exerciseRepository.count()
-        val esCount = elasticsearchOperations.count(
-            NativeQuery.builder()
-                .withQuery { q -> q.matchAll { it } }
-                .build(),
-            ExerciseDocument::class.java,
-        )
+        val esCount =
+            elasticsearchOperations.count(
+                NativeQuery.builder()
+                    .withQuery { q -> q.matchAll { it } }
+                    .build(),
+                ExerciseDocument::class.java,
+            )
 
         if (esCount >= mysqlCount) {
             log.info("Elasticsearch 동기화 불필요: ES={}건, MySQL={}건", esCount, mysqlCount)

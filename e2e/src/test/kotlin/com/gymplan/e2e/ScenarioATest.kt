@@ -2,7 +2,6 @@ package com.gymplan.e2e
 
 import io.restassured.RestAssured.given
 import io.restassured.http.ContentType
-import io.restassured.response.Response
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -24,7 +23,6 @@ import java.util.concurrent.atomic.AtomicLong
 @Tag("e2e")
 @DisplayName("[E2E-A] user-service → api-gateway → plan-service 시나리오")
 class ScenarioATest : AbstractE2ETest() {
-
     @Nested
     @DisplayName("E2E-A-01: 회원가입 → JWT → 루틴 목록 조회 (빈 목록)")
     inner class EmptyPlanList {
@@ -32,12 +30,13 @@ class ScenarioATest : AbstractE2ETest() {
         fun `회원가입 후 루틴 목록은 빈 배열이다`() {
             val user = registerUser("planUserA")
 
-            val response = given()
-                .header("Authorization", "Bearer ${user.accessToken}")
-                .get("/api/v1/plans")
-                .then()
-                .statusCode(200)
-                .extract().response()
+            val response =
+                given()
+                    .header("Authorization", "Bearer ${user.accessToken}")
+                    .get("/api/v1/plans")
+                    .then()
+                    .statusCode(200)
+                    .extract().response()
 
             assertThat(response.jsonPath().getBoolean("success")).isTrue()
             val plans: List<*> = response.jsonPath().getList<Any>("data")
@@ -53,31 +52,35 @@ class ScenarioATest : AbstractE2ETest() {
             val user = registerUser("planUserB")
 
             // 루틴 생성
-            val createBody = mapOf(
-                "name"        to "E2E 가슴 루틴",
-                "description" to "벤치프레스 위주 루틴",
-                "dayOfWeek"   to 1,     // 화요일
-            )
-            val createResponse = given()
-                .contentType(ContentType.JSON)
-                .header("Authorization", "Bearer ${user.accessToken}")
-                .body(createBody)
-                .post("/api/v1/plans")
-                .then()
-                .statusCode(201)
-                .extract().response()
+            val createBody =
+                mapOf(
+                    "name" to "E2E 가슴 루틴",
+                    "description" to "벤치프레스 위주 루틴",
+                    // 화요일
+                    "dayOfWeek" to 1,
+                )
+            val createResponse =
+                given()
+                    .contentType(ContentType.JSON)
+                    .header("Authorization", "Bearer ${user.accessToken}")
+                    .body(createBody)
+                    .post("/api/v1/plans")
+                    .then()
+                    .statusCode(201)
+                    .extract().response()
 
             assertThat(createResponse.jsonPath().getBoolean("success")).isTrue()
             val planId = createResponse.jsonPath().getLong("data.planId")
             assertThat(planId).isPositive()
 
             // 상세 조회
-            val getResponse = given()
-                .header("Authorization", "Bearer ${user.accessToken}")
-                .get("/api/v1/plans/$planId")
-                .then()
-                .statusCode(200)
-                .extract().response()
+            val getResponse =
+                given()
+                    .header("Authorization", "Bearer ${user.accessToken}")
+                    .get("/api/v1/plans/$planId")
+                    .then()
+                    .statusCode(200)
+                    .extract().response()
 
             assertThat(getResponse.jsonPath().getBoolean("success")).isTrue()
             assertThat(getResponse.jsonPath().getLong("data.planId")).isEqualTo(planId)
@@ -90,11 +93,12 @@ class ScenarioATest : AbstractE2ETest() {
     inner class NoAuthHeader {
         @Test
         fun `Authorization 헤더 없이 루틴 목록 조회하면 401 AUTH_INVALID_TOKEN이 반환된다`() {
-            val response = given()
-                .get("/api/v1/plans")
-                .then()
-                .statusCode(401)
-                .extract().response()
+            val response =
+                given()
+                    .get("/api/v1/plans")
+                    .then()
+                    .statusCode(401)
+                    .extract().response()
 
             assertThat(response.jsonPath().getBoolean("success")).isFalse()
             assertThat(response.jsonPath().getString("error.code"))
@@ -107,12 +111,13 @@ class ScenarioATest : AbstractE2ETest() {
     inner class HeaderSpoofing {
         @Test
         fun `X-User-Id 헤더를 직접 주입하면 JWT 없이도 401 AUTH_INVALID_TOKEN이 반환된다`() {
-            val response = given()
-                .header("X-User-Id", "999")
-                .get("/api/v1/plans")
-                .then()
-                .statusCode(401)
-                .extract().response()
+            val response =
+                given()
+                    .header("X-User-Id", "999")
+                    .get("/api/v1/plans")
+                    .then()
+                    .statusCode(401)
+                    .extract().response()
 
             assertThat(response.jsonPath().getBoolean("success")).isFalse()
             assertThat(response.jsonPath().getString("error.code"))
@@ -123,13 +128,14 @@ class ScenarioATest : AbstractE2ETest() {
         fun `유효한 JWT와 함께 X-User-Id 헤더를 주입해도 401 AUTH_INVALID_TOKEN이 반환된다`() {
             val user = registerUser("planUserC")
 
-            val response = given()
-                .header("Authorization", "Bearer ${user.accessToken}")
-                .header("X-User-Id", "999")     // 스푸핑 시도 — 유효 JWT여도 차단
-                .get("/api/v1/plans")
-                .then()
-                .statusCode(401)
-                .extract().response()
+            val response =
+                given()
+                    .header("Authorization", "Bearer ${user.accessToken}")
+                    .header("X-User-Id", "999") // 스푸핑 시도 — 유효 JWT여도 차단
+                    .get("/api/v1/plans")
+                    .then()
+                    .statusCode(401)
+                    .extract().response()
 
             assertThat(response.jsonPath().getBoolean("success")).isFalse()
             assertThat(response.jsonPath().getString("error.code"))
@@ -151,10 +157,11 @@ class ScenarioATest : AbstractE2ETest() {
         ): Boolean {
             val deadline = System.currentTimeMillis() + timeoutMs
             while (System.currentTimeMillis() < deadline) {
-                val response = given()
-                    .header("Authorization", "Bearer $accessToken")
-                    .queryParam("q", query)
-                    .get("/api/v1/exercises")
+                val response =
+                    given()
+                        .header("Authorization", "Bearer $accessToken")
+                        .queryParam("q", query)
+                        .get("/api/v1/exercises")
                 val names: List<String> =
                     response.jsonPath().getList("data.content.name")
                 if (names.contains(expectedName)) return true
@@ -197,19 +204,21 @@ class ScenarioATest : AbstractE2ETest() {
                 .get("/actuator/health").then().statusCode(200)
 
             // 첫 호출: cache miss → DB 조회 → Redis SET
-            val (firstResp, firstMs) = measure {
-                given().header("Authorization", "Bearer ${user.accessToken}")
-                    .get("/api/v1/plans/today")
-            }
+            val (firstResp, firstMs) =
+                measure {
+                    given().header("Authorization", "Bearer ${user.accessToken}")
+                        .get("/api/v1/plans/today")
+                }
             firstResp.then().statusCode(200)
             val firstPlanId = firstResp.jsonPath().getLong("data.planId")
             assertThat(firstPlanId).isEqualTo(planId)
 
             // 두 번째 호출: cache hit → Redis GET 만으로 응답
-            val (secondResp, secondMs) = measure {
-                given().header("Authorization", "Bearer ${user.accessToken}")
-                    .get("/api/v1/plans/today")
-            }
+            val (secondResp, secondMs) =
+                measure {
+                    given().header("Authorization", "Bearer ${user.accessToken}")
+                        .get("/api/v1/plans/today")
+                }
             secondResp.then().statusCode(200)
             val secondPlanId = secondResp.jsonPath().getLong("data.planId")
             assertThat(secondPlanId).isEqualTo(planId)

@@ -11,7 +11,6 @@ import java.util.concurrent.TimeUnit
 @Configuration
 @EnableCaching
 class CacheConfig {
-
     @Bean
     fun cacheManager(): CacheManager =
         CaffeineCacheManager("exerciseSearch").apply {

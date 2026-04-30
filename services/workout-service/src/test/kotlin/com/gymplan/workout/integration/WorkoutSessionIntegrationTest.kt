@@ -226,15 +226,15 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
             }.andExpect { status { isCreated() } }
 
             val session = sessionRepository.findById(sessionId).orElseThrow()
-            assertThat(session.exercises).hasSize(3)   // exercises 3개 유지
+            assertThat(session.exercises).hasSize(3) // exercises 3개 유지
 
             val bench = session.exercises.first { it.exerciseId == "10" }
             val squat = session.exercises.first { it.exerciseId == "20" }
-            val dead  = session.exercises.first { it.exerciseId == "30" }
+            val dead = session.exercises.first { it.exerciseId == "30" }
 
-            assertThat(bench.sets).hasSize(1)  // 벤치 변화 없음
-            assertThat(squat.sets).hasSize(2)  // 스쿼트만 2세트
-            assertThat(dead.sets).hasSize(1)   // 데드 변화 없음
+            assertThat(bench.sets).hasSize(1) // 벤치 변화 없음
+            assertThat(squat.sets).hasSize(2) // 스쿼트만 2세트
+            assertThat(dead.sets).hasSize(1) // 데드 변화 없음
         }
 
         @Test
@@ -613,12 +613,13 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
         val latch = CountDownLatch(1)
         val futures =
             (1..2).map { setNo ->
+                val body = """{"exerciseId":"10","exerciseName":"벤치프레스","muscleGroup":"CHEST","setNo":$setNo,"reps":10,"weightKg":70.0}"""
                 CompletableFuture.runAsync {
                     latch.await()
                     mockMvc.post("/api/v1/sessions/$sessionId/sets") {
                         header("X-User-Id", userId)
                         contentType = MediaType.APPLICATION_JSON
-                        content = """{"exerciseId":"10","exerciseName":"벤치프레스","muscleGroup":"CHEST","setNo":$setNo,"reps":10,"weightKg":70.0}"""
+                        content = body
                     }
                 }
             }
@@ -651,12 +652,13 @@ class WorkoutSessionIntegrationTest : AbstractIntegrationTest() {
         val futures =
             listOf("10" to "벤치프레스" to "CHEST", "20" to "스쿼트" to "LEGS").map { (idName, muscle) ->
                 val (exId, exName) = idName
+                val body = """{"exerciseId":"$exId","exerciseName":"$exName","muscleGroup":"$muscle","setNo":1,"reps":10,"weightKg":70.0}"""
                 CompletableFuture.runAsync {
                     latch.await()
                     mockMvc.post("/api/v1/sessions/$sessionId/sets") {
                         header("X-User-Id", userId)
                         contentType = MediaType.APPLICATION_JSON
-                        content = """{"exerciseId":"$exId","exerciseName":"$exName","muscleGroup":"$muscle","setNo":1,"reps":10,"weightKg":70.0}"""
+                        content = body
                     }
                 }
             }

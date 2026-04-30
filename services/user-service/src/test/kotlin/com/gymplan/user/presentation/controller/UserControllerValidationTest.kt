@@ -1,9 +1,9 @@
 package com.gymplan.user.presentation.controller
 
 import com.gymplan.common.exception.GlobalExceptionHandler
+import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import com.gymplan.user.application.dto.UserProfileResponse
 import com.gymplan.user.application.service.UserService
-import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any

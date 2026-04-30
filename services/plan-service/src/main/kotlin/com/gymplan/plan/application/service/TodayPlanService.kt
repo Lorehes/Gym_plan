@@ -48,8 +48,9 @@ class TodayPlanService(
 
         // 2. 캐시 미스 → DB 조회
         val todayDow = todayDayOfWeek()
-        val plan = workoutPlanRepository
-            .findTopByUserIdAndDayOfWeekAndIsActiveTrueOrderByCreatedAtDesc(userId, todayDow)
+        val plan =
+            workoutPlanRepository
+                .findTopByUserIdAndDayOfWeekAndIsActiveTrueOrderByCreatedAtDesc(userId, todayDow)
 
         if (plan == null) {
             log.debug("오늘({})에 배정된 루틴 없음: userId={}", todayDow, userId)
@@ -66,6 +67,5 @@ class TodayPlanService(
     }
 
     /** KST 기준 오늘 요일 (0=월, 1=화, ..., 6=일) */
-    private fun todayDayOfWeek(): Int =
-        LocalDate.now(ZONE_KST).dayOfWeek.value - 1
+    private fun todayDayOfWeek(): Int = LocalDate.now(ZONE_KST).dayOfWeek.value - 1
 }

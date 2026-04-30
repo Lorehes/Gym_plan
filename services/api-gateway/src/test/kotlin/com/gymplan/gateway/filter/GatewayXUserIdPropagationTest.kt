@@ -47,7 +47,6 @@ import org.springframework.test.web.reactive.server.WebTestClient
         "백로그: docs/specs/backlog.md (1주 내 처리)",
 )
 class GatewayXUserIdPropagationTest : AbstractGatewayTest() {
-
     @Autowired
     lateinit var client: WebTestClient
 
@@ -130,7 +129,7 @@ class GatewayXUserIdPropagationTest : AbstractGatewayTest() {
         // 공격자가 JWT 를 가지고 있어도 X-User-Id 를 함께 주입하면 차단됨
         client.get().uri("/echo/headers")
             .header(HttpHeaders.AUTHORIZATION, "Bearer $token")
-            .header("X-User-Id", "1")   // 권한 상승 시도
+            .header("X-User-Id", "1") // 권한 상승 시도
             .exchange()
             .expectStatus().isUnauthorized
             .expectBody()
@@ -163,10 +162,11 @@ class GatewayXUserIdPropagationTest : AbstractGatewayTest() {
 
         // X-User-Id 헤더는 MISSING (filter 가 주입하지 않았으므로) 를 확인하려면
         // 401 이므로 응답 바디가 에러 형식 → jsonPath("$.userId") 는 존재하지 않음
-        val responseBody = client.get().uri("/echo/headers")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer $refreshToken")
-            .exchange()
-            .returnResult(String::class.java)
+        val responseBody =
+            client.get().uri("/echo/headers")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $refreshToken")
+                .exchange()
+                .returnResult(String::class.java)
         assertThat(responseBody.status.value()).isEqualTo(401)
     }
 }

@@ -14,6 +14,5 @@ import org.springframework.data.redis.core.StringRedisTemplate
 @Configuration
 class RedisConfig {
     @Bean
-    fun stringRedisTemplate(factory: RedisConnectionFactory): StringRedisTemplate =
-        StringRedisTemplate(factory)
+    fun stringRedisTemplate(factory: RedisConnectionFactory): StringRedisTemplate = StringRedisTemplate(factory)
 }

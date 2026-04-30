@@ -1,6 +1,7 @@
 package com.gymplan.user.presentation.controller
 
 import com.gymplan.common.dto.ApiResponse
+import com.gymplan.common.security.CurrentUserId
 import com.gymplan.user.application.dto.LoginRequest
 import com.gymplan.user.application.dto.LoginResponse
 import com.gymplan.user.application.dto.RefreshRequest
@@ -8,7 +9,6 @@ import com.gymplan.user.application.dto.RegisterRequest
 import com.gymplan.user.application.dto.RegisterResponse
 import com.gymplan.user.application.dto.TokenRefreshResponse
 import com.gymplan.user.application.service.AuthService
-import com.gymplan.common.security.CurrentUserId
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity

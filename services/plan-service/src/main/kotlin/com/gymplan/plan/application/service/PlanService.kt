@@ -50,12 +50,16 @@ class PlanService(
             .map { it.toSummaryResponse() }
 
     @Transactional(readOnly = true)
-    fun getPlan(userId: Long, planId: Long): PlanDetailResponse {
+    fun getPlan(
+        userId: Long,
+        planId: Long,
+    ): PlanDetailResponse {
         // 캐시 키가 userId를 포함하므로 히트 시 소유권이 이미 보장됨 — DB 조회 불필요
         planCacheManager.getPlanDetail(userId, planId)?.let { return it }
 
-        val plan = workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)
-            ?: throw NotFoundException(ErrorCode.PLAN_NOT_FOUND)
+        val plan =
+            workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)
+                ?: throw NotFoundException(ErrorCode.PLAN_NOT_FOUND)
         if (plan.userId != userId) throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
 
         val response = plan.toDetailResponse()
@@ -64,23 +68,32 @@ class PlanService(
     }
 
     @Transactional
-    fun createPlan(userId: Long, request: CreatePlanRequest): PlanDetailResponse {
-        val plan = WorkoutPlan(
-            userId = userId,
-            name = request.name,
-            description = request.description,
-            dayOfWeek = request.dayOfWeek,
-        )
+    fun createPlan(
+        userId: Long,
+        request: CreatePlanRequest,
+    ): PlanDetailResponse {
+        val plan =
+            WorkoutPlan(
+                userId = userId,
+                name = request.name,
+                description = request.description,
+                dayOfWeek = request.dayOfWeek,
+            )
         val saved = workoutPlanRepository.save(plan)
         log.info("루틴 생성: userId={}, planId={}, name={}", userId, saved.id, saved.name)
         return saved.toDetailResponse()
     }
 
     @Transactional
-    fun updatePlan(userId: Long, planId: Long, request: UpdatePlanRequest): PlanDetailResponse {
+    fun updatePlan(
+        userId: Long,
+        planId: Long,
+        request: UpdatePlanRequest,
+    ): PlanDetailResponse {
         // exercises 포함 로딩 → 이후 toDetailResponse()에서 추가 쿼리 불필요
-        val plan = workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)
-            ?: throw NotFoundException(ErrorCode.PLAN_NOT_FOUND)
+        val plan =
+            workoutPlanRepository.findWithExercisesByIdAndIsActiveTrue(planId)
+                ?: throw NotFoundException(ErrorCode.PLAN_NOT_FOUND)
         if (plan.userId != userId) throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
 
         plan.update(request.name, request.description, request.dayOfWeek)
@@ -93,7 +106,10 @@ class PlanService(
     }
 
     @Transactional
-    fun deletePlan(userId: Long, planId: Long) {
+    fun deletePlan(
+        userId: Long,
+        planId: Long,
+    ) {
         val plan = findPlanForUser(userId, planId)
         plan.softDelete()
         workoutPlanRepository.save(plan)
@@ -105,24 +121,30 @@ class PlanService(
     // ─────────────────── 운동 관리 ───────────────────
 
     @Transactional
-    fun addExercise(userId: Long, planId: Long, request: AddExerciseRequest): ExerciseItemResponse {
+    fun addExercise(
+        userId: Long,
+        planId: Long,
+        request: AddExerciseRequest,
+    ): ExerciseItemResponse {
         val plan = findPlanForUser(userId, planId)
 
-        val orderIndex = request.orderIndex
-            ?: ((planExerciseRepository.findTopByPlanIdOrderByOrderIndexDesc(planId)?.orderIndex ?: -1) + 1)
+        val orderIndex =
+            request.orderIndex
+                ?: ((planExerciseRepository.findTopByPlanIdOrderByOrderIndexDesc(planId)?.orderIndex ?: -1) + 1)
 
-        val exercise = PlanExercise(
-            plan = plan,
-            exerciseId = request.exerciseId,
-            exerciseName = request.exerciseName,
-            muscleGroup = request.muscleGroup,
-            orderIndex = orderIndex,
-            targetSets = request.targetSets,
-            targetReps = request.targetReps,
-            targetWeight = request.targetWeightKg,
-            restSeconds = request.restSeconds,
-            notes = request.notes,
-        )
+        val exercise =
+            PlanExercise(
+                plan = plan,
+                exerciseId = request.exerciseId,
+                exerciseName = request.exerciseName,
+                muscleGroup = request.muscleGroup,
+                orderIndex = orderIndex,
+                targetSets = request.targetSets,
+                targetReps = request.targetReps,
+                targetWeight = request.targetWeightKg,
+                restSeconds = request.restSeconds,
+                notes = request.notes,
+            )
         val saved = planExerciseRepository.save(exercise)
 
         planCacheManager.evictPlanCaches(userId, planId)
@@ -157,7 +179,11 @@ class PlanService(
     }
 
     @Transactional
-    fun deleteExercise(userId: Long, planId: Long, exerciseItemId: Long) {
+    fun deleteExercise(
+        userId: Long,
+        planId: Long,
+        exerciseItemId: Long,
+    ) {
         findPlanForUser(userId, planId)
         val exercise = findExerciseForPlan(planId, exerciseItemId)
         planExerciseRepository.delete(exercise)
@@ -167,7 +193,11 @@ class PlanService(
     }
 
     @Transactional
-    fun reorderExercises(userId: Long, planId: Long, request: ReorderExercisesRequest) {
+    fun reorderExercises(
+        userId: Long,
+        planId: Long,
+        request: ReorderExercisesRequest,
+    ) {
         findPlanForUser(userId, planId)
 
         val exercises = planExerciseRepository.findByPlanIdOrderByOrderIndexAsc(planId)
@@ -181,8 +211,9 @@ class PlanService(
 
         val exerciseMap = exercises.associateBy { it.id!! }
         request.orderedIds.forEachIndexed { index, id ->
-            val exercise = exerciseMap[id]
-                ?: throw GymPlanException(ErrorCode.VALIDATION_FAILED, "존재하지 않는 exerciseItemId: $id")
+            val exercise =
+                exerciseMap[id]
+                    ?: throw GymPlanException(ErrorCode.VALIDATION_FAILED, "존재하지 않는 exerciseItemId: $id")
             exercise.updateOrderIndex(index)
         }
         planExerciseRepository.saveAll(exerciseMap.values)
@@ -193,10 +224,14 @@ class PlanService(
 
     // ─────────────────── 내부 헬퍼 ───────────────────
 
-    private fun findPlanForUser(userId: Long, planId: Long): WorkoutPlan {
-        val plan = workoutPlanRepository.findById(planId)
-            .filter { it.isActive }
-            .orElseThrow { NotFoundException(ErrorCode.PLAN_NOT_FOUND) }
+    private fun findPlanForUser(
+        userId: Long,
+        planId: Long,
+    ): WorkoutPlan {
+        val plan =
+            workoutPlanRepository.findById(planId)
+                .filter { it.isActive }
+                .orElseThrow { NotFoundException(ErrorCode.PLAN_NOT_FOUND) }
 
         if (plan.userId != userId) {
             throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)
@@ -204,9 +239,13 @@ class PlanService(
         return plan
     }
 
-    private fun findExerciseForPlan(planId: Long, exerciseItemId: Long): PlanExercise {
-        val exercise = planExerciseRepository.findById(exerciseItemId)
-            .orElseThrow { NotFoundException(ErrorCode.EXERCISE_NOT_FOUND) }
+    private fun findExerciseForPlan(
+        planId: Long,
+        exerciseItemId: Long,
+    ): PlanExercise {
+        val exercise =
+            planExerciseRepository.findById(exerciseItemId)
+                .orElseThrow { NotFoundException(ErrorCode.EXERCISE_NOT_FOUND) }
 
         if (exercise.plan.id != planId) {
             throw ForbiddenException(ErrorCode.PLAN_ACCESS_DENIED)

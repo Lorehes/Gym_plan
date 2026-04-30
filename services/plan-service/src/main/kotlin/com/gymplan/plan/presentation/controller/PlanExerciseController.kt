@@ -59,8 +59,7 @@ class PlanExerciseController(
         @PathVariable planId: Long,
         @PathVariable exerciseItemId: Long,
         @Valid @RequestBody request: UpdateExerciseRequest,
-    ): ApiResponse<ExerciseItemResponse> =
-        ApiResponse.success(planService.updateExercise(userId, planId, exerciseItemId, request))
+    ): ApiResponse<ExerciseItemResponse> = ApiResponse.success(planService.updateExercise(userId, planId, exerciseItemId, request))
 
     /** 운동 제거 */
     @DeleteMapping("/{exerciseItemId}")

@@ -2,6 +2,7 @@ package com.gymplan.exercise.presentation.controller
 
 import com.gymplan.common.dto.PageResponse
 import com.gymplan.common.exception.GlobalExceptionHandler
+import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import com.gymplan.exercise.application.dto.ExerciseDetailResponse
 import com.gymplan.exercise.application.dto.ExerciseSummaryResponse
 import com.gymplan.exercise.application.service.ExerciseSearchService
@@ -9,7 +10,6 @@ import com.gymplan.exercise.application.service.ExerciseService
 import com.gymplan.exercise.domain.vo.Difficulty
 import com.gymplan.exercise.domain.vo.Equipment
 import com.gymplan.exercise.domain.vo.MuscleGroup
-import com.gymplan.common.security.CurrentUserIdArgumentResolver
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.mockito.kotlin.any

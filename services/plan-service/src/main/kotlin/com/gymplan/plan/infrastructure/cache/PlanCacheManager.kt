@@ -44,7 +44,10 @@ class PlanCacheManager(
         }.getOrNull()
     }
 
-    fun setTodayPlan(userId: Long, response: TodayPlanResponse) {
+    fun setTodayPlan(
+        userId: Long,
+        response: TodayPlanResponse,
+    ) {
         val key = todayKey(userId)
         val json = objectMapper.writeValueAsString(response)
         redis.opsForValue().set(key, json, TTL)
@@ -58,7 +61,10 @@ class PlanCacheManager(
 
     // ───── 루틴 상세 캐시 ─────
 
-    fun getPlanDetail(userId: Long, planId: Long): PlanDetailResponse? {
+    fun getPlanDetail(
+        userId: Long,
+        planId: Long,
+    ): PlanDetailResponse? {
         val key = cacheKey(userId, planId)
         val json = redis.opsForValue().get(key) ?: return null
         return runCatching {
@@ -69,7 +75,11 @@ class PlanCacheManager(
         }.getOrNull()
     }
 
-    fun setPlanDetail(userId: Long, planId: Long, response: PlanDetailResponse) {
+    fun setPlanDetail(
+        userId: Long,
+        planId: Long,
+        response: PlanDetailResponse,
+    ) {
         val key = cacheKey(userId, planId)
         val json = objectMapper.writeValueAsString(response)
         redis.opsForValue().set(key, json, TTL)
@@ -80,7 +90,10 @@ class PlanCacheManager(
      * 루틴 수정/삭제/운동 변경 시 연관 캐시 전체 무효화.
      * TTL 만료를 기다리지 않는다 — 체육관에서 최신 루틴 보장 필수.
      */
-    fun evictPlanCaches(userId: Long, planId: Long) {
+    fun evictPlanCaches(
+        userId: Long,
+        planId: Long,
+    ) {
         redis.delete(listOf(todayKey(userId), cacheKey(userId, planId)))
         log.debug("캐시 무효화: plan:today:{}, plan:cache:{}:{}", userId, userId, planId)
     }
@@ -89,7 +102,10 @@ class PlanCacheManager(
 
     private fun todayKey(userId: Long) = "plan:today:$userId"
 
-    private fun cacheKey(userId: Long, planId: Long) = "plan:cache:$userId:$planId"
+    private fun cacheKey(
+        userId: Long,
+        planId: Long,
+    ) = "plan:cache:$userId:$planId"
 
     companion object {
         val TTL: Duration = Duration.ofMinutes(10)

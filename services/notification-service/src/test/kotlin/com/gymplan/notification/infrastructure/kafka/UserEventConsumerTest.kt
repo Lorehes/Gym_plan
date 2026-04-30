@@ -6,28 +6,31 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.kafka.support.Acknowledgment
 
 @ExtendWith(MockitoExtension::class)
 class UserEventConsumerTest {
     @Mock private lateinit var fcmService: FcmService
+
     @Mock private lateinit var idempotencyService: IdempotencyService
+
     @Mock private lateinit var ack: Acknowledgment
 
     @InjectMocks
     private lateinit var consumer: UserEventConsumer
 
-    private val event = UserRegisteredEvent(
-        userId = "10",
-        email = "user@example.com",
-        nickname = "철수",
-        occurredAt = "2026-04-08T08:00:00Z",
-    )
+    private val event =
+        UserRegisteredEvent(
+            userId = "10",
+            email = "user@example.com",
+            nickname = "철수",
+            occurredAt = "2026-04-08T08:00:00Z",
+        )
 
     // TC-06: 회원가입 환영 FCM 발송
     @Test

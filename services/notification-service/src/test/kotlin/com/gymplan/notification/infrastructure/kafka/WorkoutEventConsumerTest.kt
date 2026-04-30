@@ -8,30 +8,34 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.InjectMocks
 import org.mockito.Mock
+import org.mockito.junit.jupiter.MockitoExtension
 import org.mockito.kotlin.any
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.mockito.junit.jupiter.MockitoExtension
 import org.springframework.kafka.support.Acknowledgment
 
 @ExtendWith(MockitoExtension::class)
 class WorkoutEventConsumerTest {
     @Mock private lateinit var fcmService: FcmService
+
     @Mock private lateinit var settingsRepository: NotificationSettingsRedisRepository
+
     @Mock private lateinit var idempotencyService: IdempotencyService
+
     @Mock private lateinit var ack: Acknowledgment
 
     @InjectMocks
     private lateinit var consumer: WorkoutEventConsumer
 
-    private val event = WorkoutSessionCompletedEvent(
-        sessionId = "665f1a2b3c4d5e6f7a8b9c0d",
-        userId = "1",
-        durationSec = 4200,
-        totalVolume = 3840.0,
-        occurredAt = "2026-04-08T10:10:05Z",
-    )
+    private val event =
+        WorkoutSessionCompletedEvent(
+            sessionId = "665f1a2b3c4d5e6f7a8b9c0d",
+            userId = "1",
+            durationSec = 4200,
+            totalVolume = 3840.0,
+            occurredAt = "2026-04-08T10:10:05Z",
+        )
 
     // TC-04: 알림 설정 활성화 → FCM 발송
     @Test

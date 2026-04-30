@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 
 interface WorkoutPlanRepository : JpaRepository<WorkoutPlan, Long> {
-
     /**
      * 내 루틴 목록 (soft delete 제외).
      * @EntityGraph 로 exercises 컬렉션을 단일 LEFT JOIN 쿼리로 로딩.

@@ -14,16 +14,18 @@ import org.springframework.stereotype.Component
  */
 @Component
 class WorkoutMetrics(registry: MeterRegistry) {
+    val sessionsStarted: Counter =
+        Counter.builder("gymplan_workout_sessions_total")
+            .description("운동 세션 시작 수")
+            .register(registry)
 
-    val sessionsStarted: Counter = Counter.builder("gymplan_workout_sessions_total")
-        .description("운동 세션 시작 수")
-        .register(registry)
+    val sessionsCompleted: Counter =
+        Counter.builder("gymplan_workout_sessions_completed")
+            .description("운동 세션 완료 수")
+            .register(registry)
 
-    val sessionsCompleted: Counter = Counter.builder("gymplan_workout_sessions_completed")
-        .description("운동 세션 완료 수")
-        .register(registry)
-
-    val setsLogged: Counter = Counter.builder("gymplan_sets_logged_total")
-        .description("세트 기록 수")
-        .register(registry)
+    val setsLogged: Counter =
+        Counter.builder("gymplan_sets_logged_total")
+            .description("세트 기록 수")
+            .register(registry)
 }
