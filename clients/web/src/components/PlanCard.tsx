@@ -33,7 +33,8 @@ export function PlanCard({ plan, onDelete }: Props) {
         aria-label={`루틴 ${plan.name} 열기`}
       />
 
-      <div className="relative flex items-start justify-between gap-3">
+      {/* pointer-events-none: 콘텐츠 클릭을 absolute 버튼으로 통과시킴 */}
+      <div className="relative flex items-start justify-between gap-3 pointer-events-none">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold text-neutral-900 truncate">
             {plan.name}
@@ -55,7 +56,8 @@ export function PlanCard({ plan, onDelete }: Props) {
           </div>
         </div>
 
-        <Menu as="div" className="relative">
+        {/* 메뉴 버튼은 pointer-events-auto 복원 */}
+        <Menu as="div" className="relative pointer-events-auto">
           <MenuButton
             onClick={(e: React.MouseEvent) => e.stopPropagation()}
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-neutral-500
